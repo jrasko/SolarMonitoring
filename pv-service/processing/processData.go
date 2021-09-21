@@ -1,14 +1,16 @@
 package processing
 
 import (
+	"fmt"
 	"pv-service/database"
+	"pv-service/entities/dto"
 	"pv-service/graph/model"
 	"pv-service/utils"
 	"time"
 )
 
 type Processor interface {
-	GetDailyDataBetweenDates(start *time.Time, end *time.Time) ([]*model.DailyData, error)
+	GetDailyDataBetweenDates(start *time.Time, end *time.Time, interval uint32) ([]*model.DailyData, error)
 	GetRawDataBetweenDates(begin *time.Time, end *time.Time) ([]*model.RawData, error)
 }
 
@@ -22,7 +24,7 @@ func GetProcessor() Processor {
 	}
 }
 
-func (p *processor) GetDailyDataBetweenDates(start *time.Time, end *time.Time) ([]*model.DailyData, error) {
+func (p *processor) GetDailyDataBetweenDates(start *time.Time, end *time.Time, averageTime uint32) ([]*model.DailyData, error) {
 	startTime := utils.ConvertTimestampToUnix(start)
 	endTime := utils.ConvertTimestampToUnix(end)
 	data, err := p.db.GetDailyDataBetweenStartAndEndTime(startTime, endTime+12*utils.Hour)
@@ -40,15 +42,54 @@ func (p *processor) GetDailyDataBetweenDates(start *time.Time, end *time.Time) (
 			continue
 		}
 		d := utils.ConvertUnixToTimeStamp(pvData.Time - 12*utils.Hour)
+		s := utils.ConvertUnixToTimeStamp(lastT)
 		dailyDataArray = append(dailyDataArray, &model.DailyData{
-			Date:           time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
-			StartUpTime:    utils.ConvertUnixToTimeStamp(lastT),
+			Date: dto.Date{
+				Day:   uint8(d.Day()),
+				Month: uint8(d.Month()),
+				Year:  uint16(d.Year()),
+			},
+			StartupTime: dto.TimeOfDay{
+				Seconds: uint8(s.Second()),
+				Minutes: uint8(s.Minute()),
+				Hours:   uint8(s.Hour()),
+			},
 			ProducedEnergy: uint32(pvData.TotalE - lastE),
 		})
 		lastE = pvData.TotalE
 		lastT = pvData.Time
 	}
-	return dailyDataArray, nil
+	// Merge doubled Data
+	var purgedDataArray = []*model.DailyData{dailyDataArray[0]}
+	currentIndex := 0
+	for _, dailyData := range dailyDataArray[1:] {
+		if dailyData.Date != purgedDataArray[currentIndex].Date {
+			purgedDataArray = append(purgedDataArray, dailyData)
+			currentIndex++
+		} else {
+			purgedDataArray[currentIndex].ProducedEnergy += dailyData.ProducedEnergy
+		}
+	}
+	if averageTime == 1 {
+		return purgedDataArray, nil
+	}
+	// Build Averages
+	if averageTime > uint32(len(purgedDataArray)) {
+		return nil, fmt.Errorf("averageTime is larger than timespan")
+	}
+
+	var averagedNumbers []uint32
+	for i, dailyData := range purgedDataArray {
+		if uint32(i) >= averageTime {
+			averagedNumbers[uint32(i)%averageTime] = dailyData.ProducedEnergy
+			dailyData.ProducedEnergy = utils.GetAverage(averagedNumbers)
+		} else {
+			averagedNumbers = append(averagedNumbers, dailyData.ProducedEnergy)
+			dailyData.ProducedEnergy = utils.GetAverage(averagedNumbers)
+		}
+	}
+
+	return purgedDataArray, nil
 }
 
 func (p *processor) GetRawDataBetweenDates(start *time.Time, end *time.Time) ([]*model.RawData, error) {

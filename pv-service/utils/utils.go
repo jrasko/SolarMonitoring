@@ -14,7 +14,15 @@ func ConvertUnixToTimeStamp(unixtime uint32) time.Time {
 }
 
 func ConvertTimestampToUnix(timestamp *time.Time) uint32 {
-	unixtime := timestamp.Unix()
-	unixtime -= decade
-	return uint32(unixtime)
+	unixTime := timestamp.Unix()
+	unixTime -= decade
+	return uint32(unixTime)
+}
+
+func GetAverage(arr []uint32) uint32 {
+	sum := uint32(0)
+	for _, n := range arr {
+		sum += n
+	}
+	return sum / uint32(len(arr))
 }

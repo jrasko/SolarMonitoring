@@ -5,20 +5,25 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"pv-service/graph/generated"
 	"pv-service/graph/model"
 	"time"
 )
 
-func (r *queryResolver) DailyDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.DailyData, error) {
-	data, err := r.Resolver.Processor.GetDailyDataBetweenDates(begin, end)
+func (r *queryResolver) DailyDataSets(
+	_ context.Context, begin *time.Time, end *time.Time, interval uint32) ([]*model.DailyData, error) {
+	if interval == 0 {
+		return nil, errors.New("interval cannot be 0")
+	}
+	data, err := r.Resolver.Processor.GetDailyDataBetweenDates(begin, end, interval)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-func (r *queryResolver) RawDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {
+func (r *queryResolver) RawDataSets(_ context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {
 	data, err := r.Resolver.Processor.GetRawDataBetweenDates(begin, end)
 	if err != nil {
 		return nil, err

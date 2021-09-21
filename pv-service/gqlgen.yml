@@ -59,3 +59,9 @@ models:
       - github.com/99designs/gqlgen/graphql.Uint32
       - github.com/99designs/gqlgen/graphql.Uint64
       - github.com/99designs/gqlgen/graphql.Uint
+  TimeOfDay:
+    model:
+      - pv-service/entities/dto.TimeOfDay
+  Date:
+    model:
+      - pv-service/entities/dto.Date

@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  # My grafana service
+  grafana:
+    image: grafana/grafana:8.1.4
+    container_name: grafana
+    network_mode: host
+    ports:
+      - 8000:8000
+    environment:
+      GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"

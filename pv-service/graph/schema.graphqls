@@ -2,15 +2,18 @@
 #
 # https://gqlgen.com/getting-started/
 scalar Time
+scalar TimeOfDay
+scalar Date
 scalar UInt
 
+
 type Query {
-    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [DailyData!]!
+    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" interval:UInt!=1): [DailyData!]!
     RawDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [RawData!]!
 }
 type DailyData{
-    date: Time!
-    startUpTime: Time!
+    date: Date!
+    startupTime: TimeOfDay!
     producedEnergy: UInt!
 }
 type RawData {

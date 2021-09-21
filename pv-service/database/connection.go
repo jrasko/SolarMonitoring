@@ -55,7 +55,7 @@ func (c *dbConnection) GetNonDailyDataBetweenStartAndEndTime(startTime uint32, e
 	err := c.postgres.
 		Order("time ASC").
 		Where("time BETWEEN ? AND ?", startTime, endTime).
-		Where("total_e IS NULL").
+		Where("total_e IS NULL AND dc1_u IS NOT NULL").
 		Find(&data).Error
 	return &data, err
 }
@@ -66,8 +66,8 @@ func (c *dbConnection) GetDailyDataBetweenStartAndEndTime(startTime uint32, endT
 	)
 	err := c.postgres.
 		Order("time ASC").
-		Where("time BETWEEN ? AND ?", startTime, endTime).
 		Where("total_e IS NOT NULL").
+		Where("time BETWEEN ? AND ?", startTime, endTime).
 		Find(&data).Error
 	return &data, err
 }
