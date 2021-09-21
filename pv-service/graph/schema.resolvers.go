@@ -11,12 +11,11 @@ import (
 	"time"
 )
 
-func (r *queryResolver) DailyDataSets(
-	_ context.Context, begin *time.Time, end *time.Time, interval uint32) ([]*model.DailyData, error) {
-	if interval == 0 {
+func (r *queryResolver) DailyDataSets(_ context.Context, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
+	if energyInterval == 0 || startupInterval == 0 {
 		return nil, errors.New("interval cannot be 0")
 	}
-	data, err := r.Resolver.Processor.GetDailyDataBetweenDates(begin, end, interval)
+	data, err := r.Resolver.Processor.GetDailyDataBetweenDates(begin, end, energyInterval, startupInterval)
 	if err != nil {
 		return nil, err
 	}

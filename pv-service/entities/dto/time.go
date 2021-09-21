@@ -7,9 +7,9 @@ import (
 )
 
 type TimeOfDay struct {
-	Seconds uint8
-	Minutes uint8
 	Hours   uint8
+	Minutes uint8
+	Seconds uint8
 }
 
 func (t *TimeOfDay) UnmarshalGQL(interface{}) error {

@@ -9,3 +9,9 @@ services:
       - 8000:8000
     environment:
       GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
+    volumes:
+      - grafana-data:/var/lib/grafana
+# Explicitly define the persistent volume for your data storage
+volumes:
+  grafana-data:
+    external: true
