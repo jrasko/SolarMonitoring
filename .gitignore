@@ -1,7 +1,6 @@
 /.idea/
-/pv-frontend/node_modules/
-/pv-frontend/pv-frontend.iml
+/pv-monitor.iml
+/infrastructure/infrastructure.iml
 /pv-service/pv-service.iml
 /pv-service/graph/generated/
 /pv-service/graph/model/
-/pv-monitor.iml
