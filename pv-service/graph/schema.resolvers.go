@@ -15,11 +15,19 @@ func (r *queryResolver) DailyDataSets(_ context.Context, begin *time.Time, end *
 	if energyInterval == 0 || startupInterval == 0 {
 		return nil, errors.New("interval cannot be 0")
 	}
-	data, err := r.Resolver.Processor.GetDailyDataBetweenDates(begin, end, energyInterval, startupInterval)
+	dailyData, err := r.Resolver.Processor.GetDailyData(begin, end, energyInterval, startupInterval)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return dailyData, nil
+}
+
+func (r *queryResolver) MinuteDataSets(_ context.Context, begin *time.Time, end *time.Time) ([]*model.MinuteDataOfDay, error) {
+	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(begin, end)
+	if err != nil {
+		return nil, err
+	}
+	return minuteData, nil
 }
 
 func (r *queryResolver) RawDataSets(_ context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {

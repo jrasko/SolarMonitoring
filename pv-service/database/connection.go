@@ -4,7 +4,11 @@ import (
 	"fmt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"log"
+	"os"
 	"pv-service/entities/dao"
+	"time"
 )
 
 type DBConnection interface {
@@ -20,15 +24,18 @@ type dbConnection struct {
 
 func GetDBConnection() DBConnection {
 	dbConn := new(dbConnection)
-	err := dbConn.ConnectToDB()
-	if err != nil {
+	if err := dbConn.ConnectToDB(); err != nil {
 		return nil
 	}
 	return dbConn
 }
 
 func (c *dbConnection) ConnectToDB() error {
-	db, err := gorm.Open(postgres.Open("host=192.168.2.115 user=raskob password=raskob dbname=postgres port=5432"))
+	db, err := gorm.Open(postgres.Open("host=192.168.2.115 user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
+		Logger: logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{SlowThreshold: time.Second}),
+	})
 	if err != nil {
 		return err
 	}
