@@ -9,7 +9,7 @@ scalar UInt
 
 type Query {
     dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" EnergyInterval:UInt!=1 startupInterval:UInt!=1): [DailyData!]!
-    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [MinuteDataOfDay!]!
+    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" CurrentInterval:UInt!=1): [MinuteDataOfDay!]!
     RawDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [RawData!]!
 }
 type DailyData{

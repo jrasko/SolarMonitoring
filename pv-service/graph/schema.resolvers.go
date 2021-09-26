@@ -22,8 +22,8 @@ func (r *queryResolver) DailyDataSets(_ context.Context, begin *time.Time, end *
 	return dailyData, nil
 }
 
-func (r *queryResolver) MinuteDataSets(_ context.Context, begin *time.Time, end *time.Time) ([]*model.MinuteDataOfDay, error) {
-	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(begin, end)
+func (r *queryResolver) MinuteDataSets(_ context.Context, begin *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
+	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(begin, end, currentInterval)
 	if err != nil {
 		return nil, err
 	}

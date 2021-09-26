@@ -28,10 +28,10 @@ func (t Date) MarshalGQL(w io.Writer) {
 func (t Date) isLeapYear() bool {
 	return t.Year%400 == 0 || (t.Year%4 == 0 && t.Year%100 != 0)
 }
-func (t Date) Yesterday() {
+func (t Date) Yesterday() Date {
 	t.Day--
 	if t.Day >= 1 {
-		return
+		return t
 	}
 	t.Month--
 	switch {
@@ -44,4 +44,5 @@ func (t Date) Yesterday() {
 	default:
 		t.Day = monthLengths[t.Month-1]
 	}
+	return t
 }

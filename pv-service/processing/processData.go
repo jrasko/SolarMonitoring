@@ -10,8 +10,8 @@ import (
 
 type Processor interface {
 	GetDailyData(start *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error)
+	GetMinuteDataOfDay(start *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error)
 	GetRawDataBetweenDates(start *time.Time, end *time.Time) ([]*model.RawData, error)
-	GetMinuteDataOfDay(start *time.Time, end *time.Time) ([]*model.MinuteDataOfDay, error)
 }
 
 const averageDataPerDay = 60
@@ -25,7 +25,7 @@ func GetProcessor() Processor {
 		db: database.GetDBConnection(),
 	}
 }
-func (p *processor) GetMinuteDataOfDay(start *time.Time, end *time.Time) ([]*model.MinuteDataOfDay, error) {
+func (p *processor) GetMinuteDataOfDay(start *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	rawData, err := p.db.GetNonDailyDataBetweenStartAndEndTime(
 		utils.ConvertTimestampToUnix(start),
 		utils.ConvertTimestampToUnix(end))
@@ -60,7 +60,11 @@ func (p *processor) GetMinuteDataOfDay(start *time.Time, end *time.Time) ([]*mod
 		Dc2i: dcI[1] / uint32(adding),
 		Dc3i: dcI[2] / uint32(adding),
 	})
-	return processedData, nil
+	averagizedData, err := averagizeCurrent(currentInterval, processedData)
+	if err != nil {
+		return nil, err
+	}
+	return averagizedData, nil
 }
 
 func (p *processor) GetDailyData(
@@ -85,8 +89,7 @@ func (p *processor) GetDailyData(
 			lastTime = pvData.time
 			continue
 		}
-		date := pvData.date
-		date.Yesterday()
+		date := pvData.date.Yesterday()
 		dailyDataArray = append(dailyDataArray, &model.DailyData{
 			Date:           date,
 			StartupTime:    lastTime,

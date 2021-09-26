@@ -41,6 +41,32 @@ func averagizeEnergy(intervalTime uint32, dailyDataArray []*model.DailyData) ([]
 	}
 	return dailyDataArray, nil
 }
+func averagizeCurrent(intervalTime uint32, minuteDataArray []*model.MinuteDataOfDay) ([]*model.MinuteDataOfDay, error) {
+	if intervalTime == 1 {
+		return minuteDataArray, nil
+	}
+	if intervalTime > uint32(len(minuteDataArray)) {
+		return nil, fmt.Errorf("intervalTime is larger than timespan")
+	}
+	var averagedDC1I []uint32
+	var averagedDC2I []uint32
+	var averagedDC3I []uint32
+	for i, minuteData := range minuteDataArray {
+		if uint32(i) >= intervalTime {
+			averagedDC1I[uint32(i)%intervalTime] = minuteData.Dc1i
+			averagedDC2I[uint32(i)%intervalTime] = minuteData.Dc2i
+			averagedDC3I[uint32(i)%intervalTime] = minuteData.Dc3i
+		} else {
+			averagedDC1I = append(averagedDC1I, minuteData.Dc1i)
+			averagedDC2I = append(averagedDC2I, minuteData.Dc2i)
+			averagedDC3I = append(averagedDC3I, minuteData.Dc3i)
+		}
+		minuteData.Dc1i = utils.GetAverageEnergy(averagedDC1I)
+		minuteData.Dc2i = utils.GetAverageEnergy(averagedDC2I)
+		minuteData.Dc3i = utils.GetAverageEnergy(averagedDC3I)
+	}
+	return minuteDataArray, nil
+}
 
 func averagizeTime(intervalTime uint32, dailyDataArray []*model.DailyData) ([]*model.DailyData, error) {
 	if intervalTime == 1 {
@@ -75,12 +101,12 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	for _, pvData := range *data {
 		timeOfDatapoint := utils.ConvertUnixToTimeStamp(pvData.Time)
 		mappedData = append(mappedData, &processingData{
-			date: getDate(timeOfDatapoint),
 			time: dto.TimeOfDay{
 				Seconds: uint8(timeOfDatapoint.Second()),
 				Minutes: uint8(timeOfDatapoint.Minute()),
 				Hours:   uint8(timeOfDatapoint.Hour()),
 			},
+			date:   getDate(timeOfDatapoint),
 			totalE: pvData.TotalE,
 		})
 	}
