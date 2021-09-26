@@ -1,6 +1,4 @@
 /.idea/
-/pv-monitor.iml
-/infrastructure/infrastructure.iml
-/pv-service/pv-service.iml
+*.iml
 /pv-service/graph/generated/
 /pv-service/graph/model/
