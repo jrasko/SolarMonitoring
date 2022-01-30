@@ -43,7 +43,7 @@ type PVData struct {
 	Ain3   int16
 	Ain4   int16
 	AcS    uint16
-	Err    int16
+	Err    uint16
 	EnsS   uint16
 	EnsErr uint16
 	KbS    string
