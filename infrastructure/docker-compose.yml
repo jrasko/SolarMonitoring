@@ -9,7 +9,20 @@ services:
       GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
     volumes:
       - grafana-data:/var/lib/grafana
+  postgres:
+    restart: always
+    image: postgres:14
+    container_name: PostgreSQL
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: raskob
+      POSTGRES_PASSWORD: raskob
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 # Explicitly define the persistent volume for your data storage
 volumes:
   grafana-data:
     external: true
+  postgres_data:
