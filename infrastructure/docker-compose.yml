@@ -2,7 +2,7 @@ version: "3.8"
 services:
   # My grafana service
   grafana:
-    image: grafana/grafana:8.1.5
+    image: grafana/grafana:9.0.4
     container_name: grafana
     network_mode: host
     environment:
