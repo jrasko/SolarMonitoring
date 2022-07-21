@@ -1,5 +1,3 @@
 /.idea/
 *.iml
-/pv-service/graph/generated/
-/pv-service/graph/model/
 **/node_modules
