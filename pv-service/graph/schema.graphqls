@@ -16,6 +16,7 @@ type DailyData{
     date: Date!
     startupTime: TimeOfDay!
     producedEnergy: UInt!
+    cumulativeEnergy: UInt!
 }
 type MinuteDataOfDay{
     date: Date!

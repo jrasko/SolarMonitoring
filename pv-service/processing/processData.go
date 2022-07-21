@@ -91,9 +91,10 @@ func (p *processor) GetDailyData(
 		}
 		date := pvData.date.Yesterday()
 		dailyDataArray = append(dailyDataArray, &model.DailyData{
-			Date:           date,
-			StartupTime:    lastTime,
-			ProducedEnergy: uint32(pvData.totalE - lastE),
+			Date:             date,
+			StartupTime:      lastTime,
+			ProducedEnergy:   uint32(pvData.totalE - lastE),
+			CumulativeEnergy: uint32(pvData.totalE),
 		})
 		lastE = pvData.totalE
 		lastTime = pvData.time
