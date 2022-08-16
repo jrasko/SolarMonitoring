@@ -2,6 +2,7 @@ version: "3.8"
 services:
   # My grafana service
   grafana:
+    restart: unless-stopped
     image: grafana/grafana:9.0.4
     container_name: grafana
     network_mode: host
@@ -21,6 +22,12 @@ services:
       POSTGRES_DB: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  webservice:
+    image: pv-server
+    container_name: PV-Server
+    ports:
+      - 8080:8080
+    restart: unless-stopped
 # Explicitly define the persistent volume for your data storage
 volumes:
   grafana-data:
