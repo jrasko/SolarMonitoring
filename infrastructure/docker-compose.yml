@@ -28,7 +28,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   webservice:
-    build: ../pv-server
+    build: ../pv-service
     container_name: PV-Server
     ports:
       - 8080:8080
