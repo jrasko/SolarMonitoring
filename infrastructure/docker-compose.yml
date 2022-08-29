@@ -8,8 +8,13 @@ services:
     network_mode: host
     environment:
       GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
+      GF_SERVER_PROTOCOL: "https"
+      GF_SERVER_CERT_FILE: "/var/ssl/server.crt"
+      GF_SERVER_CERT_KEY: "/var/ssl/server.key"
     volumes:
       - grafana-data:/var/lib/grafana
+      - /etc/letsencrypt/live/raskobvpn.ddns.net/fullchain.pem:/var/ssl/server.crt
+      - /etc/letsencrypt/live/raskobvpn.ddns.net/privkey.pem:/var/ssl/server.key
   postgres:
     restart: always
     image: postgres:14
