@@ -3,7 +3,7 @@ services:
   # My grafana service
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:9.0.4
+    image: grafana/grafana:9.1.1
     container_name: grafana
     network_mode: host
     environment:
@@ -28,7 +28,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
   webservice:
-    image: pv-server
+    build: ../pv-server
     container_name: PV-Server
     ports:
       - 8080:8080
