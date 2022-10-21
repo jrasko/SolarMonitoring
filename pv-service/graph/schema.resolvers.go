@@ -6,36 +6,45 @@ package graph
 import (
 	"context"
 	"errors"
+	"fmt"
 	"pv-service/graph/generated"
 	"pv-service/graph/model"
 	"time"
 )
 
-func (r *queryResolver) DailyDataSets(_ context.Context, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
+// DailyDataSets is the resolver for the dailyDataSets field.
+func (r *queryResolver) DailyDataSets(ctx context.Context, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
 	if energyInterval == 0 || startupInterval == 0 {
 		return nil, errors.New("interval cannot be 0")
 	}
-	dailyData, err := r.Resolver.Processor.GetDailyData(begin, end, energyInterval, startupInterval)
+	dailyData, err := r.Resolver.Processor.GetDailyData(ctx, begin, end, energyInterval, startupInterval)
 	if err != nil {
 		return nil, err
 	}
 	return dailyData, nil
 }
 
-func (r *queryResolver) MinuteDataSets(_ context.Context, begin *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
-	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(begin, end, currentInterval)
+// MinuteDataSets is the resolver for the MinuteDataSets field.
+func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
+	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(ctx, begin, end, currentInterval)
 	if err != nil {
 		return nil, err
 	}
 	return minuteData, nil
 }
 
-func (r *queryResolver) RawDataSets(_ context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {
-	data, err := r.Resolver.Processor.GetRawDataBetweenDates(begin, end)
+// RawDataSets is the resolver for the RawDataSets field.
+func (r *queryResolver) RawDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {
+	data, err := r.Resolver.Processor.GetRawDataBetweenDates(ctx, begin, end)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
+}
+
+// ZappiDataSets is the resolver for the ZappiDataSets field.
+func (r *queryResolver) ZappiDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.ZappiData, error) {
+	panic(fmt.Errorf("not implemented: ZappiDataSets - ZappiDataSets"))
 }
 
 // Query returns generated.QueryResolver implementation.

@@ -1,6 +1,7 @@
 package processing
 
 import (
+	"context"
 	"pv-service/database"
 	"pv-service/entities/dto"
 	"pv-service/graph/model"
@@ -8,25 +9,20 @@ import (
 	"time"
 )
 
-type Processor interface {
-	GetDailyData(start *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error)
-	GetMinuteDataOfDay(start *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error)
-	GetRawDataBetweenDates(start *time.Time, end *time.Time) ([]*model.RawData, error)
-}
-
 const averageDataPerDay = 60
 
-type processor struct {
-	db database.DBConnection
+type Processor struct {
+	db *database.DBConnection
 }
 
-func GetProcessor() Processor {
-	return &processor{
+func GetProcessor() *Processor {
+	return &Processor{
 		db: database.GetDBConnection(),
 	}
 }
-func (p *processor) GetMinuteDataOfDay(start *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
+func (p *Processor) GetMinuteDataOfDay(ctx context.Context, start *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	rawData, err := p.db.GetNonDailyDataBetweenStartAndEndTime(
+		ctx,
 		utils.ConvertTimestampToUnix(start),
 		utils.ConvertTimestampToUnix(end))
 	if err != nil {
@@ -67,9 +63,9 @@ func (p *processor) GetMinuteDataOfDay(start *time.Time, end *time.Time, current
 	return averagizedData, nil
 }
 
-func (p *processor) GetDailyData(
-	start *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
+func (p *Processor) GetDailyData(ctx context.Context, start *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
 	data, err := p.db.GetDailyDataBetweenStartAndEndTime(
+		ctx,
 		utils.ConvertTimestampToUnix(start),
 		utils.ConvertTimestampToUnix(end)+12*utils.Hour,
 	)
@@ -111,10 +107,10 @@ func (p *processor) GetDailyData(
 	return dailyDataArray, nil
 }
 
-func (p *processor) GetRawDataBetweenDates(start *time.Time, end *time.Time) ([]*model.RawData, error) {
+func (p *Processor) GetRawDataBetweenDates(ctx context.Context, start *time.Time, end *time.Time) ([]*model.RawData, error) {
 	startTime := utils.ConvertTimestampToUnix(start)
 	endTime := utils.ConvertTimestampToUnix(end)
-	data, err := p.db.GetNonDailyDataBetweenStartAndEndTime(startTime, endTime)
+	data, err := p.db.GetNonDailyDataBetweenStartAndEndTime(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
 	}

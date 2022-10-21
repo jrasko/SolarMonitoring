@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -11,26 +12,19 @@ import (
 	"time"
 )
 
-type DBConnection interface {
-	ConnectToDB() error
-	GetAllData() *[]dao.PVData
-	GetNonDailyDataBetweenStartAndEndTime(startTime uint32, endTime uint32) (*[]dao.PVData, error)
-	GetDailyDataBetweenStartAndEndTime(startTime uint32, endTime uint32) (*[]dao.PVData, error)
-}
-
-type dbConnection struct {
+type DBConnection struct {
 	postgres *gorm.DB
 }
 
-func GetDBConnection() DBConnection {
-	dbConn := new(dbConnection)
+func GetDBConnection() *DBConnection {
+	dbConn := new(DBConnection)
 	if err := dbConn.ConnectToDB(); err != nil {
 		return nil
 	}
 	return dbConn
 }
 
-func (c *dbConnection) ConnectToDB() error {
+func (c *DBConnection) ConnectToDB() error {
 	db, err := gorm.Open(postgres.Open("host=192.168.2.115 user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
 		Logger: logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
@@ -43,11 +37,11 @@ func (c *dbConnection) ConnectToDB() error {
 	return nil
 }
 
-func (c dbConnection) GetAllData() *[]dao.PVData {
+func (c *DBConnection) GetAllData(ctx context.Context) *[]dao.PVData {
 	var (
 		data []dao.PVData
 	)
-	err := c.postgres.Find(&data).Error
+	err := c.postgres.WithContext(ctx).Find(&data).Error
 	if err != nil {
 		fmt.Print(err)
 		return nil
@@ -55,11 +49,12 @@ func (c dbConnection) GetAllData() *[]dao.PVData {
 	return &data
 }
 
-func (c *dbConnection) GetNonDailyDataBetweenStartAndEndTime(startTime uint32, endTime uint32) (*[]dao.PVData, error) {
+func (c *DBConnection) GetNonDailyDataBetweenStartAndEndTime(ctx context.Context, startTime uint32, endTime uint32) (*[]dao.PVData, error) {
 	var (
 		data []dao.PVData
 	)
 	err := c.postgres.
+		WithContext(ctx).
 		Order("time ASC").
 		Where("time BETWEEN ? AND ?", startTime, endTime).
 		Where("total_e IS NULL AND dc1_u IS NOT NULL").
@@ -67,11 +62,12 @@ func (c *dbConnection) GetNonDailyDataBetweenStartAndEndTime(startTime uint32, e
 	return &data, err
 }
 
-func (c *dbConnection) GetDailyDataBetweenStartAndEndTime(startTime uint32, endTime uint32) (*[]dao.PVData, error) {
+func (c *DBConnection) GetDailyDataBetweenStartAndEndTime(ctx context.Context, startTime uint32, endTime uint32) (*[]dao.PVData, error) {
 	var (
 		data []dao.PVData
 	)
 	err := c.postgres.
+		WithContext(ctx).
 		Order("time ASC").
 		Where("total_e IS NOT NULL").
 		Where("time BETWEEN ? AND ?", startTime, endTime).

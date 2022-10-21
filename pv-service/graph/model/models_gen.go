@@ -4,6 +4,7 @@ package model
 
 import (
 	"pv-service/entities/dto"
+	"time"
 )
 
 type DailyData struct {
@@ -58,4 +59,12 @@ type RawData struct {
 	Err    int32   `json:"Err"`
 	EnsErr uint32  `json:"Ens_Err"`
 	Event  string  `json:"Event"`
+}
+
+type ZappiData struct {
+	ZappiSn        int32     `json:"zappi_sn"`
+	PluggedIn      time.Time `json:"plugged_in"`
+	Unplugged      time.Time `json:"unplugged"`
+	ChargeDuration int32     `json:"charge_duration"`
+	Electricity    float64   `json:"electricity"`
 }
