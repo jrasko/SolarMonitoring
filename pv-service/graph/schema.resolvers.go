@@ -6,7 +6,6 @@ package graph
 import (
 	"context"
 	"errors"
-	"fmt"
 	"pv-service/graph/generated"
 	"pv-service/graph/model"
 	"time"
@@ -44,7 +43,11 @@ func (r *queryResolver) RawDataSets(ctx context.Context, begin *time.Time, end *
 
 // ZappiDataSets is the resolver for the ZappiDataSets field.
 func (r *queryResolver) ZappiDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.ZappiData, error) {
-	panic(fmt.Errorf("not implemented: ZappiDataSets - ZappiDataSets"))
+	data, err := r.Resolver.Processor.GetZappiDataBetweenDates(ctx, begin, end)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // Query returns generated.QueryResolver implementation.

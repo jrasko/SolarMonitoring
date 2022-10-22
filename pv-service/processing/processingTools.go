@@ -41,6 +41,7 @@ func averagizeEnergy(intervalTime uint32, dailyDataArray []*model.DailyData) ([]
 	}
 	return dailyDataArray, nil
 }
+
 func averagizeCurrent(intervalTime uint32, minuteDataArray []*model.MinuteDataOfDay) ([]*model.MinuteDataOfDay, error) {
 	if intervalTime == 1 {
 		return minuteDataArray, nil

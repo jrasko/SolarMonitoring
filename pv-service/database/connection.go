@@ -74,3 +74,13 @@ func (c *DBConnection) GetDailyDataBetweenStartAndEndTime(ctx context.Context, s
 		Find(&data).Error
 	return &data, err
 }
+
+func (c *DBConnection) GetZappiDataBetweenStartAndEnddate(ctx context.Context, begin *time.Time, end *time.Time) (*[]dao.ZappiData, error) {
+	data := []dao.ZappiData{}
+	err := c.postgres.
+		WithContext(ctx).
+		Order("plugged_in ASC").
+		Where("plugged_in BETWEEN ? AND ? OR unplugged BETWEEN ? AND ?", begin, end, begin, end).
+		Find(&data).Error
+	return &data, err
+}
