@@ -112,7 +112,7 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 		})
 	}
 	currentIndex := 0
-	var purgedDataArray = []processingData{*mappedData[0]}
+	purgedDataArray := []processingData{*mappedData[0]}
 	for _, dataPoint := range mappedData {
 		if dataPoint.date != purgedDataArray[currentIndex].date {
 			purgedDataArray = append(purgedDataArray, *dataPoint)

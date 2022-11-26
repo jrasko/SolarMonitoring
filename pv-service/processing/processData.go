@@ -26,6 +26,9 @@ func (p *Processor) GetMinuteDataOfDay(ctx context.Context, start *dto.PVTime, e
 	if err != nil {
 		return nil, err
 	}
+	if rawData == nil || len(*rawData) == 0 {
+		return []*model.MinuteDataOfDay{}, nil
+	}
 	processedData := make([]*model.MinuteDataOfDay, 0, len(*rawData)/averageDataPerDay)
 	lastDate := getDate(dto.PVTimeFromUnix((*rawData)[0].Time))
 	dcI := [3]uint32{0, 0, 0}
@@ -69,6 +72,9 @@ func (p *Processor) GetDailyData(ctx context.Context, start *dto.PVTime, end *dt
 	)
 	if err != nil {
 		return nil, err
+	}
+	if data == nil || len(*data) == 0 {
+		return []*model.DailyData{}, nil
 	}
 	mappedData := mapDataAndRemoveDuplicates(data)
 
@@ -124,6 +130,9 @@ func (p *Processor) GetZappiDataBetweenDates(ctx context.Context, begin *dto.PVT
 	data, err := p.db.GetZappiDataBetweenStartAndEnddate(ctx, &beginTime, &endTime)
 	if err != nil {
 		return nil, err
+	}
+	if data == nil || len(*data) == 0 {
+		return []*model.ZappiData{}, nil
 	}
 	var zappiDataArray []*model.ZappiData
 	for _, zappiData := range *data {
