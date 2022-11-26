@@ -4,7 +4,6 @@ package model
 
 import (
 	"pv-service/entities/dto"
-	"time"
 )
 
 type DailyData struct {
@@ -62,9 +61,9 @@ type RawData struct {
 }
 
 type ZappiData struct {
-	ZappiSn        int32     `json:"zappi_sn"`
-	PluggedIn      time.Time `json:"plugged_in"`
-	Unplugged      time.Time `json:"unplugged"`
-	ChargeDuration int32     `json:"charge_duration"`
-	Electricity    float64   `json:"electricity"`
+	ZappiSn        int32      `json:"zappi_sn"`
+	PluggedIn      dto.PVTime `json:"plugged_in"`
+	Unplugged      dto.PVTime `json:"unplugged"`
+	ChargeDuration int32      `json:"charge_duration"`
+	Electricity    float64    `json:"electricity"`
 }

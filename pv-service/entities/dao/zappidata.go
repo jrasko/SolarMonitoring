@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"pv-service/entities/dto"
 	"pv-service/graph/model"
 	"time"
 )
@@ -20,8 +21,8 @@ func (ZappiData) TableName() string {
 func (z ZappiData) ToModel() model.ZappiData {
 	return model.ZappiData{
 		ZappiSn:        z.ZappiSN,
-		PluggedIn:      z.PluggedIn,
-		Unplugged:      z.Unplugged,
+		PluggedIn:      dto.PVTimeFromTime(z.PluggedIn),
+		Unplugged:      dto.PVTimeFromTime(z.Unplugged),
 		ChargeDuration: z.ChargeDuration,
 		Electricity:    z.Electricity,
 	}

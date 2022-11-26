@@ -15,11 +15,11 @@ type processingData struct {
 	totalE uint16
 }
 
-func getDate(t time.Time) dto.Date {
+func getDate(t dto.PVTime) dto.Date {
 	return dto.Date{
-		Day:   uint8(t.Day()),
-		Month: uint8(t.Month()),
-		Year:  uint16(t.Year()),
+		Day:   uint8(t.ToTime().Day()),
+		Month: uint8(t.ToTime().Month()),
+		Year:  uint16(t.ToTime().Year()),
 	}
 }
 
@@ -81,7 +81,7 @@ func averagizeTime(intervalTime uint32, dailyDataArray []*model.DailyData) ([]*m
 		currentTimeStamp := time.Date(
 			1970, 1, 1,
 			int(dailyData.StartupTime.Hours), int(dailyData.StartupTime.Minutes), int(dailyData.StartupTime.Seconds),
-			0, utils.UTC1).Unix()
+			0, dto.UTC1).Unix()
 		if uint32(i) >= intervalTime {
 			averagedTime[uint32(i)%intervalTime] = currentTimeStamp
 		} else {
@@ -100,14 +100,14 @@ func averagizeTime(intervalTime uint32, dailyDataArray []*model.DailyData) ([]*m
 func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	mappedData := make([]*processingData, 0, len(*data))
 	for _, pvData := range *data {
-		timeOfDatapoint := utils.ConvertUnixToTimeStamp(pvData.Time)
+		timeOfDatapoint := dto.PVTimeFromUnix(pvData.Time).ToTime()
 		mappedData = append(mappedData, &processingData{
 			time: dto.TimeOfDay{
 				Seconds: uint8(timeOfDatapoint.Second()),
 				Minutes: uint8(timeOfDatapoint.Minute()),
 				Hours:   uint8(timeOfDatapoint.Hour()),
 			},
-			date:   getDate(timeOfDatapoint),
+			date:   getDate(dto.PVTimeFromTime(timeOfDatapoint)),
 			totalE: pvData.TotalE,
 		})
 	}

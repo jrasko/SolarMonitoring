@@ -34,8 +34,8 @@ resolver:
 
 # gqlgen will search for any type names in the schema in these go packages
 # if they match it will use them, otherwise it will generate them.
-autobind:
-  - "pv-service/graph/model"
+#autobind:
+#  - "pv-service/graph/model"
 
 # This section declares type mapping between the GraphQL and go type systems
 #
@@ -62,6 +62,9 @@ models:
   TimeOfDay:
     model:
       - pv-service/entities/dto.TimeOfDay
+  Time:
+    model:
+      - pv-service/entities/dto.PVTime
   Date:
     model:
       - pv-service/entities/dto.Date

@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
@@ -60,10 +59,10 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		DailyDataSets  func(childComplexity int, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) int
-		MinuteDataSets func(childComplexity int, begin *time.Time, end *time.Time, currentInterval uint32) int
-		RawDataSets    func(childComplexity int, begin *time.Time, end *time.Time) int
-		ZappiDataSets  func(childComplexity int, begin *time.Time, end *time.Time) int
+		DailyDataSets  func(childComplexity int, begin *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) int
+		MinuteDataSets func(childComplexity int, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) int
+		RawDataSets    func(childComplexity int, begin *dto.PVTime, end *dto.PVTime) int
+		ZappiDataSets  func(childComplexity int, begin *dto.PVTime, end *dto.PVTime) int
 	}
 
 	RawData struct {
@@ -116,10 +115,10 @@ type ComplexityRoot struct {
 }
 
 type QueryResolver interface {
-	DailyDataSets(ctx context.Context, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error)
-	MinuteDataSets(ctx context.Context, begin *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error)
-	RawDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error)
-	ZappiDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.ZappiData, error)
+	DailyDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error)
+	MinuteDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error)
+	RawDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.RawData, error)
+	ZappiDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.ZappiData, error)
 }
 
 type executableSchema struct {
@@ -203,7 +202,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.DailyDataSets(childComplexity, args["begin"].(*time.Time), args["end"].(*time.Time), args["EnergyInterval"].(uint32), args["startupInterval"].(uint32)), true
+		return e.complexity.Query.DailyDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime), args["EnergyInterval"].(uint32), args["startupInterval"].(uint32)), true
 
 	case "Query.MinuteDataSets":
 		if e.complexity.Query.MinuteDataSets == nil {
@@ -215,7 +214,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.MinuteDataSets(childComplexity, args["begin"].(*time.Time), args["end"].(*time.Time), args["CurrentInterval"].(uint32)), true
+		return e.complexity.Query.MinuteDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime), args["CurrentInterval"].(uint32)), true
 
 	case "Query.RawDataSets":
 		if e.complexity.Query.RawDataSets == nil {
@@ -227,7 +226,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.RawDataSets(childComplexity, args["begin"].(*time.Time), args["end"].(*time.Time)), true
+		return e.complexity.Query.RawDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime)), true
 
 	case "Query.ZappiDataSets":
 		if e.complexity.Query.ZappiDataSets == nil {
@@ -239,7 +238,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.ZappiDataSets(childComplexity, args["begin"].(*time.Time), args["end"].(*time.Time)), true
+		return e.complexity.Query.ZappiDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime)), true
 
 	case "RawData.AC1_I":
 		if e.complexity.RawData.Ac1I == nil {
@@ -678,19 +677,19 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Query_MinuteDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *time.Time
+	var arg0 *dto.PVTime
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *time.Time
+	var arg1 *dto.PVTime
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -711,19 +710,19 @@ func (ec *executionContext) field_Query_MinuteDataSets_args(ctx context.Context,
 func (ec *executionContext) field_Query_RawDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *time.Time
+	var arg0 *dto.PVTime
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *time.Time
+	var arg1 *dto.PVTime
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -735,19 +734,19 @@ func (ec *executionContext) field_Query_RawDataSets_args(ctx context.Context, ra
 func (ec *executionContext) field_Query_ZappiDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *time.Time
+	var arg0 *dto.PVTime
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *time.Time
+	var arg1 *dto.PVTime
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -774,19 +773,19 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_dailyDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *time.Time
+	var arg0 *dto.PVTime
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *time.Time
+	var arg1 *dto.PVTime
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖtimeᚐTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1217,7 +1216,7 @@ func (ec *executionContext) _Query_dailyDataSets(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().DailyDataSets(rctx, fc.Args["begin"].(*time.Time), fc.Args["end"].(*time.Time), fc.Args["EnergyInterval"].(uint32), fc.Args["startupInterval"].(uint32))
+		return ec.resolvers.Query().DailyDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime), fc.Args["EnergyInterval"].(uint32), fc.Args["startupInterval"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1282,7 +1281,7 @@ func (ec *executionContext) _Query_MinuteDataSets(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MinuteDataSets(rctx, fc.Args["begin"].(*time.Time), fc.Args["end"].(*time.Time), fc.Args["CurrentInterval"].(uint32))
+		return ec.resolvers.Query().MinuteDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime), fc.Args["CurrentInterval"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1347,7 +1346,7 @@ func (ec *executionContext) _Query_RawDataSets(ctx context.Context, field graphq
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().RawDataSets(rctx, fc.Args["begin"].(*time.Time), fc.Args["end"].(*time.Time))
+		return ec.resolvers.Query().RawDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1478,7 +1477,7 @@ func (ec *executionContext) _Query_ZappiDataSets(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ZappiDataSets(rctx, fc.Args["begin"].(*time.Time), fc.Args["end"].(*time.Time))
+		return ec.resolvers.Query().ZappiDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3358,9 +3357,9 @@ func (ec *executionContext) _ZappiData_plugged_in(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(dto.PVTime)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_plugged_in(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3402,9 +3401,9 @@ func (ec *executionContext) _ZappiData_unplugged(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(time.Time)
+	res := resTmp.(dto.PVTime)
 	fc.Result = res
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+	return ec.marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_unplugged(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -6407,19 +6406,14 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
-	res, err := graphql.UnmarshalTime(v)
+func (ec *executionContext) unmarshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, v interface{}) (dto.PVTime, error) {
+	var res dto.PVTime
+	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
-	res := graphql.MarshalTime(v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
+func (ec *executionContext) marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, sel ast.SelectionSet, v dto.PVTime) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) unmarshalNTimeOfDay2pvᚑserviceᚋentitiesᚋdtoᚐTimeOfDay(ctx context.Context, v interface{}) (dto.TimeOfDay, error) {
@@ -6796,20 +6790,20 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {
+func (ec *executionContext) unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, v interface{}) (*dto.PVTime, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalTime(v)
-	return &res, graphql.ErrorOnPath(ctx, err)
+	var res = new(dto.PVTime)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
+func (ec *executionContext) marshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, sel ast.SelectionSet, v *dto.PVTime) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	res := graphql.MarshalTime(*v)
-	return res
+	return v
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

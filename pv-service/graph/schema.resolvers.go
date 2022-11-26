@@ -6,13 +6,13 @@ package graph
 import (
 	"context"
 	"errors"
+	"pv-service/entities/dto"
 	"pv-service/graph/generated"
 	"pv-service/graph/model"
-	"time"
 )
 
 // DailyDataSets is the resolver for the dailyDataSets field.
-func (r *queryResolver) DailyDataSets(ctx context.Context, begin *time.Time, end *time.Time, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
+func (r *queryResolver) DailyDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
 	if energyInterval == 0 || startupInterval == 0 {
 		return nil, errors.New("interval cannot be 0")
 	}
@@ -24,7 +24,7 @@ func (r *queryResolver) DailyDataSets(ctx context.Context, begin *time.Time, end
 }
 
 // MinuteDataSets is the resolver for the MinuteDataSets field.
-func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *time.Time, end *time.Time, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
+func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(ctx, begin, end, currentInterval)
 	if err != nil {
 		return nil, err
@@ -33,7 +33,7 @@ func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *time.Time, en
 }
 
 // RawDataSets is the resolver for the RawDataSets field.
-func (r *queryResolver) RawDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.RawData, error) {
+func (r *queryResolver) RawDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.RawData, error) {
 	data, err := r.Resolver.Processor.GetRawDataBetweenDates(ctx, begin, end)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (r *queryResolver) RawDataSets(ctx context.Context, begin *time.Time, end *
 }
 
 // ZappiDataSets is the resolver for the ZappiDataSets field.
-func (r *queryResolver) ZappiDataSets(ctx context.Context, begin *time.Time, end *time.Time) ([]*model.ZappiData, error) {
+func (r *queryResolver) ZappiDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.ZappiData, error) {
 	data, err := r.Resolver.Processor.GetZappiDataBetweenDates(ctx, begin, end)
 	if err != nil {
 		return nil, err
