@@ -3,7 +3,7 @@ services:
   # My grafana service
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:9.2.4
+    image: grafana/grafana:latest
     container_name: grafana
     network_mode: host
     environment:
