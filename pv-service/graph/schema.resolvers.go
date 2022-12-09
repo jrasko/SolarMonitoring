@@ -6,6 +6,7 @@ package graph
 import (
 	"context"
 	"errors"
+	"log"
 	"pv-service/entities/dto"
 	"pv-service/graph/generated"
 	"pv-service/graph/model"
@@ -18,6 +19,7 @@ func (r *queryResolver) DailyDataSets(ctx context.Context, begin *dto.PVTime, en
 	}
 	dailyData, err := r.Resolver.Processor.GetDailyData(ctx, begin, end, energyInterval, startupInterval)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return dailyData, nil
@@ -27,6 +29,7 @@ func (r *queryResolver) DailyDataSets(ctx context.Context, begin *dto.PVTime, en
 func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	minuteData, err := r.Resolver.Processor.GetMinuteDataOfDay(ctx, begin, end, currentInterval)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return minuteData, nil
@@ -36,6 +39,7 @@ func (r *queryResolver) MinuteDataSets(ctx context.Context, begin *dto.PVTime, e
 func (r *queryResolver) RawDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.RawData, error) {
 	data, err := r.Resolver.Processor.GetRawDataBetweenDates(ctx, begin, end)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return data, nil
@@ -45,6 +49,7 @@ func (r *queryResolver) RawDataSets(ctx context.Context, begin *dto.PVTime, end 
 func (r *queryResolver) ZappiDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.ZappiData, error) {
 	data, err := r.Resolver.Processor.GetZappiDataBetweenDates(ctx, begin, end)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return data, nil
