@@ -139,8 +139,10 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	}
 	// Remove startup timestamp before inverter replacement
 	if purgedDataArray[0].date.Year < 2020 {
-		for i := range purgedDataArray {
-			purgedDataArray[i].time = dto.TimeOfDay{}
+		for i, p := range purgedDataArray {
+			if p.date.Year < uint16(inverterSwitch.Year()) {
+				purgedDataArray[i].time = dto.TimeOfDay{}
+			}
 		}
 	}
 	return &purgedDataArray
