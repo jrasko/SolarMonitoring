@@ -49,7 +49,7 @@ type PVData struct {
 	EnsS   uint16
 	EnsErr uint16
 	KbS    string
-	TotalE uint16
+	TotalE uint32
 	IsoR   uint32
 	Event  string
 }

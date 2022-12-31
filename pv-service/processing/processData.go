@@ -78,7 +78,7 @@ func (p *Processor) GetDailyData(ctx context.Context, start *dto.PVTime, end *dt
 	}
 	mappedData := mapDataAndRemoveDuplicates(data)
 
-	lastE := uint16(0)
+	lastE := uint32(0)
 	var (
 		lastTime dto.TimeOfDay
 	)
@@ -93,8 +93,8 @@ func (p *Processor) GetDailyData(ctx context.Context, start *dto.PVTime, end *dt
 		dailyDataArray = append(dailyDataArray, &model.DailyData{
 			Date:             date,
 			StartupTime:      lastTime,
-			ProducedEnergy:   uint32(pvData.totalE - lastE),
-			CumulativeEnergy: uint32(pvData.totalE),
+			ProducedEnergy:   pvData.totalE - lastE,
+			CumulativeEnergy: pvData.totalE,
 		})
 		lastE = pvData.totalE
 		lastTime = pvData.time

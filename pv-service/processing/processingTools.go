@@ -12,7 +12,7 @@ import (
 type processingData struct {
 	date   dto.Date
 	time   dto.TimeOfDay
-	totalE uint16
+	totalE uint32
 }
 
 func getDate(t dto.PVTime) dto.Date {
