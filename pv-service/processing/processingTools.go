@@ -141,7 +141,11 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	if purgedDataArray[0].date.Year < 2020 {
 		for i, p := range purgedDataArray {
 			if p.date.Year < uint16(inverterSwitch.Year()) {
-				purgedDataArray[i].time = dto.TimeOfDay{}
+				purgedDataArray[i].time = dto.TimeOfDay{
+					Hours:   1,
+					Minutes: 0,
+					Seconds: 0,
+				}
 			}
 		}
 	}
