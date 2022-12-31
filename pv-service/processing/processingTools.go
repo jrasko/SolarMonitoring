@@ -9,6 +9,14 @@ import (
 	"time"
 )
 
+var (
+	inverterSwitch = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+)
+
+const (
+	inverterSwitchTotalE = 107758
+)
+
 type processingData struct {
 	date   dto.Date
 	time   dto.TimeOfDay
@@ -99,6 +107,7 @@ func averagizeTime(intervalTime uint32, dailyDataArray []*model.DailyData) ([]*m
 
 func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	mappedData := make([]*processingData, 0, len(*data))
+	// Map DB Datasets to Model
 	for _, pvData := range *data {
 		timeOfDatapoint := dto.PVTimeFromUnix(pvData.Time).ToTime()
 		mappedData = append(mappedData, &processingData{
@@ -111,6 +120,7 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 			totalE: pvData.TotalE,
 		})
 	}
+	// Purge Datasets on the same Day
 	currentIndex := 0
 	purgedDataArray := []processingData{*mappedData[0]}
 	for _, dataPoint := range mappedData {
@@ -119,6 +129,19 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 			currentIndex++
 		}
 	}
-
+	// Transform Total Energy after inverter replacement
+	if purgedDataArray[len(purgedDataArray)-1].date.Year >= uint16(inverterSwitch.Year()) {
+		for _, p := range purgedDataArray {
+			if p.date.Year >= uint16(inverterSwitch.Year()) {
+				p.totalE += inverterSwitchTotalE
+			}
+		}
+	}
+	// Remove startup timestamp before inverter replacement
+	if purgedDataArray[0].date.Year < 2020 {
+		for _, p := range purgedDataArray {
+			p.time = dto.TimeOfDay{}
+		}
+	}
 	return &purgedDataArray
 }
