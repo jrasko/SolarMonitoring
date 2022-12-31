@@ -131,16 +131,16 @@ func mapDataAndRemoveDuplicates(data *[]dao.PVData) *[]processingData {
 	}
 	// Transform Total Energy after inverter replacement
 	if purgedDataArray[len(purgedDataArray)-1].date.Year >= uint16(inverterSwitch.Year()) {
-		for _, p := range purgedDataArray {
+		for i, p := range purgedDataArray {
 			if p.date.Year >= uint16(inverterSwitch.Year()) {
-				p.totalE += inverterSwitchTotalE
+				purgedDataArray[i].totalE += inverterSwitchTotalE
 			}
 		}
 	}
 	// Remove startup timestamp before inverter replacement
 	if purgedDataArray[0].date.Year < 2020 {
-		for _, p := range purgedDataArray {
-			p.time = dto.TimeOfDay{}
+		for i := range purgedDataArray {
+			purgedDataArray[i].time = dto.TimeOfDay{}
 		}
 	}
 	return &purgedDataArray
