@@ -20,7 +20,7 @@ func GetProcessor() *Processor {
 }
 func (p *Processor) GetMinuteDataOfDay(ctx context.Context, start *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	unixStart := uint32(0)
-	unixEnd := uint32(0) - 1
+	unixEnd := ^uint32(0)
 	if start != nil {
 		unixStart = start.ToUnix()
 	}
@@ -71,7 +71,7 @@ func (p *Processor) GetMinuteDataOfDay(ctx context.Context, start *dto.PVTime, e
 
 func (p *Processor) GetDailyData(ctx context.Context, start *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error) {
 	unixStart := uint32(0)
-	unixEnd := uint32(0) - 1
+	unixEnd := ^uint32(0)
 	if start != nil {
 		unixStart = start.ToUnix()
 	}
