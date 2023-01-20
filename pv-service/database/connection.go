@@ -16,18 +16,18 @@ type DBConnection struct {
 	postgres *gorm.DB
 }
 
-func GetDBConnection() *DBConnection {
-	dbConn := new(DBConnection)
+func GetDBConnection() (DBConnection, error) {
+	var dbConn DBConnection
 	if err := dbConn.ConnectToDB(); err != nil {
-		return nil
+		return DBConnection{}, err
 	}
-	return dbConn
+	return dbConn, nil
 }
 
 func (c *DBConnection) ConnectToDB() error {
 	db, err := gorm.Open(postgres.Open("host=192.168.2.115 user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
 		Logger: logger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			log.New(os.Stdout, "\n", log.LstdFlags),
 			logger.Config{SlowThreshold: time.Second}),
 	})
 	if err != nil {

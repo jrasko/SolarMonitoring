@@ -20,11 +20,16 @@ func main() {
 		port = defaultPort
 	}
 
+	processor, err := processing.GetProcessor()
+	if err != nil {
+		log.Printf("Error on startup has occured: %v", err)
+		panic(err)
+	}
 	srv := handler.NewDefaultServer(
 		generated.NewExecutableSchema(
 			generated.Config{
 				Resolvers: &graph.Resolver{
-					Processor: processing.GetProcessor(),
+					Processor: processor,
 				},
 			},
 		),

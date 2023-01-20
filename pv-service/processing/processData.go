@@ -10,13 +10,15 @@ import (
 const averageDataPerDay = 60
 
 type Processor struct {
-	db *database.DBConnection
+	db database.DBConnection
 }
 
-func GetProcessor() *Processor {
-	return &Processor{
-		db: database.GetDBConnection(),
+func GetProcessor() (Processor, error) {
+	connection, err := database.GetDBConnection()
+	if err != nil {
+		return Processor{}, err
 	}
+	return Processor{db: connection}, nil
 }
 func (p *Processor) GetMinuteDataOfDay(ctx context.Context, start *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error) {
 	unixStart := uint32(0)
