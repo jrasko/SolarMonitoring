@@ -3,13 +3,14 @@ package database
 import (
 	"context"
 	"fmt"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"log"
 	"os"
 	"pv-service/entities/dao"
 	"time"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type DBConnection struct {
@@ -25,7 +26,7 @@ func GetDBConnection() (DBConnection, error) {
 }
 
 func (c *DBConnection) ConnectToDB() error {
-	db, err := gorm.Open(postgres.Open("host=192.168.2.115 user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
+	db, err := gorm.Open(postgres.Open("host=solar_db user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
 		Logger: logger.New(
 			log.New(os.Stdout, "\n", log.LstdFlags),
 			logger.Config{SlowThreshold: time.Second}),

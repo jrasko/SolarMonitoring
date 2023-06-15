@@ -4,7 +4,7 @@ services:
   grafana:
     restart: unless-stopped
     image: grafana/grafana:latest
-    container_name: grafana
+    container_name: solar_grafana
     network_mode: host
     environment:
       GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
@@ -19,10 +19,8 @@ services:
       - /etc/letsencrypt/live/raskobvpn.ddns.net/privkey.pem:/var/ssl/server.key
   postgres:
     restart: unless-stopped
-    image: postgres:14
-    container_name: PostgreSQL
-    ports:
-      - "5432:5432"
+    image: postgres:15
+    container_name: solar_db
     environment:
       POSTGRES_USER: raskob
       POSTGRES_PASSWORD: raskob
@@ -31,7 +29,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
   webservice:
     build: ../pv-service
-    container_name: PV-Server
+    container_name: solar_backend
     ports:
       - "8080:8080"
     restart: unless-stopped
