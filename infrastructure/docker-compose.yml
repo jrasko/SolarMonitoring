@@ -40,6 +40,9 @@ services:
       traefik.http.routers.webservice.entrypoints: websecure
       traefik.http.routers.webservice.tls.certresolver: myresolver
     restart: unless-stopped
+    networks:
+      - traefik
+      - default
 # Explicitly define the persistent volume for your data storage
 volumes:
   grafana-data:
