@@ -5,18 +5,22 @@ services:
     restart: unless-stopped
     image: grafana/grafana:latest
     container_name: solar_grafana
-    network_mode: host
+    labels:
+      traefik.enable: true
+      traefik.http.routers.grafana.rule: "PathPrefix(`/solar`)"
+      traefik.http.routers.grafana.entrypoints: websecure
+      traefik.http.routers.grafana.tls.certresolver: myresolver
     environment:
       GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
-      GF_SERVER_PROTOCOL: "https"
-      GF_SERVER_CERT_FILE: "/var/ssl/server.crt"
-      GF_SERVER_CERT_KEY: "/var/ssl/server.key"
+      GF_SERVER_DOMAIN: "raskobvpn.ddns.net"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/solar"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_DATE_FORMATS_INTERVAL_HOUR: "DD/MM/YYYY HH:mm"
       GF_DATE_FORMATS_INTERVAL_DAY: "DD/MM"
     volumes:
       - grafana-data:/var/lib/grafana
-      - /etc/letsencrypt/live/raskobvpn.ddns.net/fullchain.pem:/var/ssl/server.crt
-      - /etc/letsencrypt/live/raskobvpn.ddns.net/privkey.pem:/var/ssl/server.key
+    networks:
+      - traefik
   postgres:
     restart: unless-stopped
     image: postgres:14
@@ -30,11 +34,18 @@ services:
   webservice:
     build: ../pv-service
     container_name: solar_backend
-    ports:
-      - "8080:8080"
+    labels:
+      traefik.enable: true
+      traefik.http.routers.webservice.rule: "PathPrefix(`/solar/query`)"
+      traefik.http.routers.webservice.entrypoints: websecure
+      traefik.http.routers.webservice.tls.certresolver: myresolver
     restart: unless-stopped
 # Explicitly define the persistent volume for your data storage
 volumes:
   grafana-data:
     external: true
   postgres_data:
+networks:
+  traefik:
+    external: true
+
