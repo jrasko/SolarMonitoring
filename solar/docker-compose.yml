@@ -3,11 +3,11 @@ services:
   # My grafana service
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.0.3
     container_name: solar_grafana
     labels:
       traefik.enable: true
-      traefik.http.routers.grafana.rule: "PathPrefix(`/solar`)"
+      traefik.http.routers.grafana.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar`)"
       traefik.http.routers.grafana.entrypoints: websecure
       traefik.http.routers.grafana.tls.certresolver: myresolver
     environment:
@@ -36,9 +36,11 @@ services:
     container_name: solar_backend
     labels:
       traefik.enable: true
-      traefik.http.routers.webservice.rule: "PathPrefix(`/solar/query`)"
+      traefik.http.routers.webservice.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar/query`)"
       traefik.http.routers.webservice.entrypoints: websecure
       traefik.http.routers.webservice.tls.certresolver: myresolver
+    depends_on:
+      - postgres
     restart: unless-stopped
     networks:
       - traefik
