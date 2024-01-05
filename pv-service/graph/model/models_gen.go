@@ -2,68 +2,25 @@
 
 package model
 
-import (
-	"pv-service/entities/dto"
-)
-
 type DailyData struct {
-	Date             dto.Date      `json:"date"`
-	StartupTime      dto.TimeOfDay `json:"startupTime"`
-	ProducedEnergy   uint32        `json:"producedEnergy"`
-	CumulativeEnergy uint32        `json:"cumulativeEnergy"`
+	Date             Date  `json:"date"`
+	StartupTime      Clock `json:"startupTime"`
+	ProducedEnergy   int   `json:"producedEnergy"`
+	CumulativeEnergy int   `json:"cumulativeEnergy"`
 }
 
-type MinuteDataOfDay struct {
-	Date dto.Date `json:"date"`
-	Dc1i uint32   `json:"dc1I"`
-	Dc2i uint32   `json:"dc2I"`
-	Dc3i uint32   `json:"dc3I"`
+type MinuteData struct {
+	Date Date  `json:"date"`
+	DcI  []int `json:"dcI"`
 }
 
-type RawData struct {
-	Time   uint32  `json:"Time"`
-	Dc1U   uint32  `json:"DC1_U"`
-	Dc1I   uint32  `json:"DC1_I"`
-	Dc1P   uint32  `json:"DC1_P"`
-	Dc1T   uint32  `json:"DC1_T"`
-	Dc1S   uint32  `json:"DC1_S"`
-	Dc2U   uint32  `json:"DC2_U"`
-	Dc2I   uint32  `json:"DC2_I"`
-	Dc2P   uint32  `json:"DC2_P"`
-	Dc2T   uint32  `json:"DC2_T"`
-	Dc2S   uint32  `json:"DC2_S"`
-	Dc3U   uint32  `json:"DC3_U"`
-	Dc3I   uint32  `json:"DC3_I"`
-	Dc3P   uint32  `json:"DC3_P"`
-	Dc3T   uint32  `json:"DC3_T"`
-	Dc3S   uint32  `json:"DC3_S"`
-	Ac1U   uint32  `json:"AC1_U"`
-	Ac1I   uint32  `json:"AC1_I"`
-	Ac1P   int32   `json:"AC1_P"`
-	Ac1T   uint32  `json:"AC1_T"`
-	Ac2U   uint32  `json:"AC2_U"`
-	Ac2I   uint32  `json:"AC2_I"`
-	Ac2P   int32   `json:"AC2_P"`
-	Ac2T   uint32  `json:"AC2_T"`
-	Ac3U   uint32  `json:"AC3_U"`
-	Ac3I   uint32  `json:"AC3_I"`
-	Ac3P   int32   `json:"AC3_P"`
-	Ac3T   uint32  `json:"AC3_T"`
-	AcF    float64 `json:"AC_F"`
-	FcI    int32   `json:"FC_I"`
-	Ain1   int32   `json:"Ain1"`
-	Ain2   int32   `json:"Ain2"`
-	Ain3   int32   `json:"Ain3"`
-	AcS    uint32  `json:"AC_S"`
-	Err    int32   `json:"Err"`
-	EnsErr uint32  `json:"Ens_Err"`
-	Event  string  `json:"Event"`
+type Query struct {
 }
 
 type ZappiData struct {
-	ZappiSn        int32      `json:"zappi_sn"`
-	PluggedIn      dto.PVTime `json:"plugged_in"`
-	Unplugged      dto.PVTime `json:"unplugged"`
-	ChargeDuration int32      `json:"charge_duration"`
-	Electricity    float64    `json:"electricity"`
+	ZappiSn        int     `json:"zappi_sn"`
+	PluggedIn      Time    `json:"plugged_in"`
+	Unplugged      Time    `json:"unplugged"`
+	ChargeDuration int     `json:"charge_duration"`
+	Electricity    float64 `json:"electricity"`
 }

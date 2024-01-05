@@ -1,16 +1,15 @@
-package dao
+package database
 
 import (
-	"pv-service/entities/dto"
 	"pv-service/graph/model"
 	"time"
 )
 
 type ZappiData struct {
-	ZappiSN        int32
+	ZappiSN        int
 	PluggedIn      time.Time
 	Unplugged      time.Time
-	ChargeDuration int32
+	ChargeDuration int
 	Electricity    float64
 }
 
@@ -21,8 +20,8 @@ func (ZappiData) TableName() string {
 func (z ZappiData) ToModel() model.ZappiData {
 	return model.ZappiData{
 		ZappiSn:        z.ZappiSN,
-		PluggedIn:      dto.PVTimeFromTime(z.PluggedIn),
-		Unplugged:      dto.PVTimeFromTime(z.Unplugged),
+		PluggedIn:      model.Time(z.PluggedIn),
+		Unplugged:      model.Time(z.Unplugged),
 		ChargeDuration: z.ChargeDuration,
 		Electricity:    z.Electricity,
 	}

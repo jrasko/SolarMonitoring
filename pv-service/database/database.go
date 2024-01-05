@@ -2,10 +2,8 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"pv-service/entities/dao"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -38,19 +36,8 @@ func (c *DBConnection) ConnectToDB() error {
 	return nil
 }
 
-func (c *DBConnection) GetAllData(ctx context.Context) []dao.PVData {
-	var data []dao.PVData
-
-	err := c.postgres.WithContext(ctx).Find(&data).Error
-	if err != nil {
-		fmt.Print(err)
-		return nil
-	}
-	return data
-}
-
-func (c *DBConnection) GetNonDailyDataBetweenStartAndEndTime(ctx context.Context, startTime uint32, endTime uint32) ([]dao.PVData, error) {
-	var data []dao.PVData
+func (c *DBConnection) GetNonDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]MinuteData, error) {
+	var data dbMinuteDataSet
 
 	err := c.postgres.
 		WithContext(ctx).
@@ -58,11 +45,11 @@ func (c *DBConnection) GetNonDailyDataBetweenStartAndEndTime(ctx context.Context
 		Where("time BETWEEN ? AND ?", startTime, endTime).
 		Where("total_e IS NULL AND dc1_u IS NOT NULL").
 		Find(&data).Error
-	return data, err
+	return data.toExternal(), err
 }
 
-func (c *DBConnection) GetDailyDataBetweenStartAndEndTime(ctx context.Context, startTime uint32, endTime uint32) ([]dao.PVData, error) {
-	var data []dao.PVData
+func (c *DBConnection) GetDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]DailyData, error) {
+	var data []DailyData
 
 	err := c.postgres.
 		WithContext(ctx).
@@ -73,8 +60,8 @@ func (c *DBConnection) GetDailyDataBetweenStartAndEndTime(ctx context.Context, s
 	return data, err
 }
 
-func (c *DBConnection) GetZappiDataBetweenStartAndEnddate(ctx context.Context, begin time.Time, end time.Time) ([]dao.ZappiData, error) {
-	var data []dao.ZappiData
+func (c *DBConnection) GetZappiData(ctx context.Context, begin time.Time, end time.Time) ([]ZappiData, error) {
+	var data []ZappiData
 
 	err := c.postgres.
 		WithContext(ctx).
