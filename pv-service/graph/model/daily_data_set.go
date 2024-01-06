@@ -46,7 +46,7 @@ func (s *DailyDataSet) timeAverage(intervalTime int) error {
 	if intervalTime > len(dataset) {
 		return fmt.Errorf("intervalTime is larger than timespan")
 	}
-	var averagedTime []int64
+	averagedTime := make([]int64, 0, intervalTime)
 	for i, dailyData := range dataset {
 		currentTimeStamp := dailyData.StartupTime.ToSeconds()
 		if i >= intervalTime {
@@ -54,7 +54,7 @@ func (s *DailyDataSet) timeAverage(intervalTime int) error {
 		} else {
 			averagedTime = append(averagedTime, currentTimeStamp)
 		}
-		dailyData.StartupTime = ClockFromSeconds(GetAverage(averagedTime))
+		dataset[i].StartupTime = ClockFromSeconds(GetAverage(averagedTime))
 	}
 	*s = dataset
 	return nil

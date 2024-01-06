@@ -1,6 +1,7 @@
 package database
 
-/*type pvdata struct {
+/*
+type pvdata struct {
 	Time int64
 
 	Dc1U int
