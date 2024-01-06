@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"pv-service/entities/dto"
 	"pv-service/graph/model"
 	"strconv"
 	"sync"
@@ -24,6 +23,7 @@ import (
 // NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.
 func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 	return &executableSchema{
+		schema:     cfg.Schema,
 		resolvers:  cfg.Resolvers,
 		directives: cfg.Directives,
 		complexity: cfg.Complexity,
@@ -31,6 +31,7 @@ func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 }
 
 type Config struct {
+	Schema     *ast.Schema
 	Resolvers  ResolverRoot
 	Directives DirectiveRoot
 	Complexity ComplexityRoot
@@ -51,58 +52,15 @@ type ComplexityRoot struct {
 		StartupTime      func(childComplexity int) int
 	}
 
-	MinuteDataOfDay struct {
+	MinuteData struct {
 		Date func(childComplexity int) int
-		Dc1i func(childComplexity int) int
-		Dc2i func(childComplexity int) int
-		Dc3i func(childComplexity int) int
+		DcI  func(childComplexity int) int
 	}
 
 	Query struct {
-		DailyDataSets  func(childComplexity int, begin *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) int
-		MinuteDataSets func(childComplexity int, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) int
-		RawDataSets    func(childComplexity int, begin *dto.PVTime, end *dto.PVTime) int
-		ZappiDataSets  func(childComplexity int, begin *dto.PVTime, end *dto.PVTime) int
-	}
-
-	RawData struct {
-		Ac1I   func(childComplexity int) int
-		Ac1P   func(childComplexity int) int
-		Ac1T   func(childComplexity int) int
-		Ac1U   func(childComplexity int) int
-		Ac2I   func(childComplexity int) int
-		Ac2P   func(childComplexity int) int
-		Ac2T   func(childComplexity int) int
-		Ac2U   func(childComplexity int) int
-		Ac3I   func(childComplexity int) int
-		Ac3P   func(childComplexity int) int
-		Ac3T   func(childComplexity int) int
-		Ac3U   func(childComplexity int) int
-		AcF    func(childComplexity int) int
-		AcS    func(childComplexity int) int
-		Ain1   func(childComplexity int) int
-		Ain2   func(childComplexity int) int
-		Ain3   func(childComplexity int) int
-		Dc1I   func(childComplexity int) int
-		Dc1P   func(childComplexity int) int
-		Dc1S   func(childComplexity int) int
-		Dc1T   func(childComplexity int) int
-		Dc1U   func(childComplexity int) int
-		Dc2I   func(childComplexity int) int
-		Dc2P   func(childComplexity int) int
-		Dc2S   func(childComplexity int) int
-		Dc2T   func(childComplexity int) int
-		Dc2U   func(childComplexity int) int
-		Dc3I   func(childComplexity int) int
-		Dc3P   func(childComplexity int) int
-		Dc3S   func(childComplexity int) int
-		Dc3T   func(childComplexity int) int
-		Dc3U   func(childComplexity int) int
-		EnsErr func(childComplexity int) int
-		Err    func(childComplexity int) int
-		Event  func(childComplexity int) int
-		FcI    func(childComplexity int) int
-		Time   func(childComplexity int) int
+		DailyDataSets  func(childComplexity int, begin *model.Time, end *model.Time, energyInterval int, startupInterval int) int
+		MinuteDataSets func(childComplexity int, begin *model.Time, end *model.Time, currentInterval int) int
+		ZappiDataSets  func(childComplexity int, begin *model.Time, end *model.Time) int
 	}
 
 	ZappiData struct {
@@ -115,24 +73,27 @@ type ComplexityRoot struct {
 }
 
 type QueryResolver interface {
-	DailyDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, energyInterval uint32, startupInterval uint32) ([]*model.DailyData, error)
-	MinuteDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime, currentInterval uint32) ([]*model.MinuteDataOfDay, error)
-	RawDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.RawData, error)
-	ZappiDataSets(ctx context.Context, begin *dto.PVTime, end *dto.PVTime) ([]*model.ZappiData, error)
+	DailyDataSets(ctx context.Context, begin *model.Time, end *model.Time, energyInterval int, startupInterval int) ([]model.DailyData, error)
+	MinuteDataSets(ctx context.Context, begin *model.Time, end *model.Time, currentInterval int) ([]model.MinuteData, error)
+	ZappiDataSets(ctx context.Context, begin *model.Time, end *model.Time) ([]model.ZappiData, error)
 }
 
 type executableSchema struct {
+	schema     *ast.Schema
 	resolvers  ResolverRoot
 	directives DirectiveRoot
 	complexity ComplexityRoot
 }
 
 func (e *executableSchema) Schema() *ast.Schema {
+	if e.schema != nil {
+		return e.schema
+	}
 	return parsedSchema
 }
 
 func (e *executableSchema) Complexity(typeName, field string, childComplexity int, rawArgs map[string]interface{}) (int, bool) {
-	ec := executionContext{nil, e}
+	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
 
@@ -164,33 +125,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.DailyData.StartupTime(childComplexity), true
 
-	case "MinuteDataOfDay.date":
-		if e.complexity.MinuteDataOfDay.Date == nil {
+	case "MinuteData.date":
+		if e.complexity.MinuteData.Date == nil {
 			break
 		}
 
-		return e.complexity.MinuteDataOfDay.Date(childComplexity), true
+		return e.complexity.MinuteData.Date(childComplexity), true
 
-	case "MinuteDataOfDay.dc1I":
-		if e.complexity.MinuteDataOfDay.Dc1i == nil {
+	case "MinuteData.dcI":
+		if e.complexity.MinuteData.DcI == nil {
 			break
 		}
 
-		return e.complexity.MinuteDataOfDay.Dc1i(childComplexity), true
-
-	case "MinuteDataOfDay.dc2I":
-		if e.complexity.MinuteDataOfDay.Dc2i == nil {
-			break
-		}
-
-		return e.complexity.MinuteDataOfDay.Dc2i(childComplexity), true
-
-	case "MinuteDataOfDay.dc3I":
-		if e.complexity.MinuteDataOfDay.Dc3i == nil {
-			break
-		}
-
-		return e.complexity.MinuteDataOfDay.Dc3i(childComplexity), true
+		return e.complexity.MinuteData.DcI(childComplexity), true
 
 	case "Query.dailyDataSets":
 		if e.complexity.Query.DailyDataSets == nil {
@@ -202,7 +149,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.DailyDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime), args["EnergyInterval"].(uint32), args["startupInterval"].(uint32)), true
+		return e.complexity.Query.DailyDataSets(childComplexity, args["begin"].(*model.Time), args["end"].(*model.Time), args["EnergyInterval"].(int), args["startupInterval"].(int)), true
 
 	case "Query.MinuteDataSets":
 		if e.complexity.Query.MinuteDataSets == nil {
@@ -214,19 +161,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.MinuteDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime), args["CurrentInterval"].(uint32)), true
-
-	case "Query.RawDataSets":
-		if e.complexity.Query.RawDataSets == nil {
-			break
-		}
-
-		args, err := ec.field_Query_RawDataSets_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.RawDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime)), true
+		return e.complexity.Query.MinuteDataSets(childComplexity, args["begin"].(*model.Time), args["end"].(*model.Time), args["CurrentInterval"].(int)), true
 
 	case "Query.ZappiDataSets":
 		if e.complexity.Query.ZappiDataSets == nil {
@@ -238,266 +173,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.ZappiDataSets(childComplexity, args["begin"].(*dto.PVTime), args["end"].(*dto.PVTime)), true
-
-	case "RawData.AC1_I":
-		if e.complexity.RawData.Ac1I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac1I(childComplexity), true
-
-	case "RawData.AC1_P":
-		if e.complexity.RawData.Ac1P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac1P(childComplexity), true
-
-	case "RawData.AC1_T":
-		if e.complexity.RawData.Ac1T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac1T(childComplexity), true
-
-	case "RawData.AC1_U":
-		if e.complexity.RawData.Ac1U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac1U(childComplexity), true
-
-	case "RawData.AC2_I":
-		if e.complexity.RawData.Ac2I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac2I(childComplexity), true
-
-	case "RawData.AC2_P":
-		if e.complexity.RawData.Ac2P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac2P(childComplexity), true
-
-	case "RawData.AC2_T":
-		if e.complexity.RawData.Ac2T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac2T(childComplexity), true
-
-	case "RawData.AC2_U":
-		if e.complexity.RawData.Ac2U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac2U(childComplexity), true
-
-	case "RawData.AC3_I":
-		if e.complexity.RawData.Ac3I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac3I(childComplexity), true
-
-	case "RawData.AC3_P":
-		if e.complexity.RawData.Ac3P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac3P(childComplexity), true
-
-	case "RawData.AC3_T":
-		if e.complexity.RawData.Ac3T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac3T(childComplexity), true
-
-	case "RawData.AC3_U":
-		if e.complexity.RawData.Ac3U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ac3U(childComplexity), true
-
-	case "RawData.AC_F":
-		if e.complexity.RawData.AcF == nil {
-			break
-		}
-
-		return e.complexity.RawData.AcF(childComplexity), true
-
-	case "RawData.AC_S":
-		if e.complexity.RawData.AcS == nil {
-			break
-		}
-
-		return e.complexity.RawData.AcS(childComplexity), true
-
-	case "RawData.Ain1":
-		if e.complexity.RawData.Ain1 == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ain1(childComplexity), true
-
-	case "RawData.Ain2":
-		if e.complexity.RawData.Ain2 == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ain2(childComplexity), true
-
-	case "RawData.Ain3":
-		if e.complexity.RawData.Ain3 == nil {
-			break
-		}
-
-		return e.complexity.RawData.Ain3(childComplexity), true
-
-	case "RawData.DC1_I":
-		if e.complexity.RawData.Dc1I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc1I(childComplexity), true
-
-	case "RawData.DC1_P":
-		if e.complexity.RawData.Dc1P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc1P(childComplexity), true
-
-	case "RawData.DC1_S":
-		if e.complexity.RawData.Dc1S == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc1S(childComplexity), true
-
-	case "RawData.DC1_T":
-		if e.complexity.RawData.Dc1T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc1T(childComplexity), true
-
-	case "RawData.DC1_U":
-		if e.complexity.RawData.Dc1U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc1U(childComplexity), true
-
-	case "RawData.DC2_I":
-		if e.complexity.RawData.Dc2I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc2I(childComplexity), true
-
-	case "RawData.DC2_P":
-		if e.complexity.RawData.Dc2P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc2P(childComplexity), true
-
-	case "RawData.DC2_S":
-		if e.complexity.RawData.Dc2S == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc2S(childComplexity), true
-
-	case "RawData.DC2_T":
-		if e.complexity.RawData.Dc2T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc2T(childComplexity), true
-
-	case "RawData.DC2_U":
-		if e.complexity.RawData.Dc2U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc2U(childComplexity), true
-
-	case "RawData.DC3_I":
-		if e.complexity.RawData.Dc3I == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc3I(childComplexity), true
-
-	case "RawData.DC3_P":
-		if e.complexity.RawData.Dc3P == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc3P(childComplexity), true
-
-	case "RawData.DC3_S":
-		if e.complexity.RawData.Dc3S == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc3S(childComplexity), true
-
-	case "RawData.DC3_T":
-		if e.complexity.RawData.Dc3T == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc3T(childComplexity), true
-
-	case "RawData.DC3_U":
-		if e.complexity.RawData.Dc3U == nil {
-			break
-		}
-
-		return e.complexity.RawData.Dc3U(childComplexity), true
-
-	case "RawData.Ens_Err":
-		if e.complexity.RawData.EnsErr == nil {
-			break
-		}
-
-		return e.complexity.RawData.EnsErr(childComplexity), true
-
-	case "RawData.Err":
-		if e.complexity.RawData.Err == nil {
-			break
-		}
-
-		return e.complexity.RawData.Err(childComplexity), true
-
-	case "RawData.Event":
-		if e.complexity.RawData.Event == nil {
-			break
-		}
-
-		return e.complexity.RawData.Event(childComplexity), true
-
-	case "RawData.FC_I":
-		if e.complexity.RawData.FcI == nil {
-			break
-		}
-
-		return e.complexity.RawData.FcI(childComplexity), true
-
-	case "RawData.Time":
-		if e.complexity.RawData.Time == nil {
-			break
-		}
-
-		return e.complexity.RawData.Time(childComplexity), true
+		return e.complexity.Query.ZappiDataSets(childComplexity, args["begin"].(*model.Time), args["end"].(*model.Time)), true
 
 	case "ZappiData.charge_duration":
 		if e.complexity.ZappiData.ChargeDuration == nil {
@@ -540,25 +216,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
-	ec := executionContext{rc, e}
+	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
 	first := true
 
 	switch rc.Operation.Operation {
 	case ast.Query:
 		return func(ctx context.Context) *graphql.Response {
-			if !first {
-				return nil
+			var response graphql.Response
+			var data graphql.Marshaler
+			if first {
+				first = false
+				ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+				data = ec._Query(ctx, rc.Operation.SelectionSet)
+			} else {
+				if atomic.LoadInt32(&ec.pendingDeferred) > 0 {
+					result := <-ec.deferredResults
+					atomic.AddInt32(&ec.pendingDeferred, -1)
+					data = result.Result
+					response.Path = result.Path
+					response.Label = result.Label
+					response.Errors = result.Errors
+				} else {
+					return nil
+				}
 			}
-			first = false
-			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
-			data := ec._Query(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
-
-			return &graphql.Response{
-				Data: buf.Bytes(),
+			response.Data = buf.Bytes()
+			if atomic.LoadInt32(&ec.deferred) > 0 {
+				hasNext := atomic.LoadInt32(&ec.pendingDeferred) > 0
+				response.HasNext = &hasNext
 			}
+
+			return &response
 		}
 
 	default:
@@ -569,20 +260,42 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 type executionContext struct {
 	*graphql.OperationContext
 	*executableSchema
+	deferred        int32
+	pendingDeferred int32
+	deferredResults chan graphql.DeferredResult
+}
+
+func (ec *executionContext) processDeferredGroup(dg graphql.DeferredGroup) {
+	atomic.AddInt32(&ec.pendingDeferred, 1)
+	go func() {
+		ctx := graphql.WithFreshResponseContext(dg.Context)
+		dg.FieldSet.Dispatch(ctx)
+		ds := graphql.DeferredResult{
+			Path:   dg.Path,
+			Label:  dg.Label,
+			Result: dg.FieldSet,
+			Errors: graphql.GetErrors(ctx),
+		}
+		// null fields should bubble up
+		if dg.FieldSet.Invalids > 0 {
+			ds.Result = graphql.Null
+		}
+		ec.deferredResults <- ds
+	}()
 }
 
 func (ec *executionContext) introspectSchema() (*introspection.Schema, error) {
 	if ec.DisableIntrospection {
 		return nil, errors.New("introspection disabled")
 	}
-	return introspection.WrapSchema(parsedSchema), nil
+	return introspection.WrapSchema(ec.Schema()), nil
 }
 
 func (ec *executionContext) introspectType(name string) (*introspection.Type, error) {
 	if ec.DisableIntrospection {
 		return nil, errors.New("introspection disabled")
 	}
-	return introspection.WrapTypeFromDef(parsedSchema, parsedSchema.Types[name]), nil
+	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
 var sources = []*ast.Source{
@@ -590,15 +303,13 @@ var sources = []*ast.Source{
 #
 # https://gqlgen.com/getting-started/
 scalar Time
-scalar TimeOfDay
+scalar Clock
 scalar Date
-scalar UInt
 
 
 type Query {
-    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" EnergyInterval:UInt!=1 startupInterval:UInt!=1): [DailyData!]!
-    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" CurrentInterval:UInt!=1): [MinuteDataOfDay!]!
-    RawDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [RawData!]!
+    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" EnergyInterval:Int!=1 startupInterval:Int!=1): [DailyData!]!
+    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" CurrentInterval:Int!=1): [MinuteData!]!
     ZappiDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [ZappiData!]!
 }
 type ZappiData {
@@ -610,61 +321,13 @@ type ZappiData {
 }
 type DailyData{
     date: Date!
-    startupTime: TimeOfDay!
-    producedEnergy: UInt!
-    cumulativeEnergy: UInt!
+    startupTime: Clock!
+    producedEnergy: Int!
+    cumulativeEnergy: Int!
 }
-type MinuteDataOfDay{
+type MinuteData{
     date: Date!
-    dc1I: UInt!
-    dc2I: UInt!
-    dc3I: UInt!
-}
-type RawData {
-    Time: UInt!
-
-    DC1_U: UInt!
-    DC1_I: UInt!
-    DC1_P: UInt!
-    DC1_T: UInt!
-    DC1_S: UInt!
-
-    DC2_U: UInt!
-    DC2_I: UInt!
-    DC2_P: UInt!
-    DC2_T: UInt!
-    DC2_S: UInt!
-
-    DC3_U: UInt!
-    DC3_I: UInt!
-    DC3_P: UInt!
-    DC3_T: UInt!
-    DC3_S: UInt!
-
-    AC1_U: UInt!
-    AC1_I: UInt!
-    AC1_P: Int!
-    AC1_T: UInt!
-
-    AC2_U: UInt!
-    AC2_I: UInt!
-    AC2_P: Int!
-    AC2_T: UInt!
-
-    AC3_U: UInt!
-    AC3_I: UInt!
-    AC3_P: Int!
-    AC3_T: UInt!
-
-    AC_F: Float!
-    FC_I: Int!
-    Ain1: Int!
-    Ain2: Int!
-    Ain3: Int!
-    AC_S: UInt!
-    Err: Int!
-    Ens_Err: UInt!
-    Event: String!
+    dcI: [Int!]!
 }
 `, BuiltIn: false},
 }
@@ -677,28 +340,28 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Query_MinuteDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *dto.PVTime
+	var arg0 *model.Time
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *dto.PVTime
+	var arg1 *model.Time
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["end"] = arg1
-	var arg2 uint32
+	var arg2 int
 	if tmp, ok := rawArgs["CurrentInterval"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("CurrentInterval"))
-		arg2, err = ec.unmarshalNUInt2uint32(ctx, tmp)
+		arg2, err = ec.unmarshalNInt2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -707,46 +370,22 @@ func (ec *executionContext) field_Query_MinuteDataSets_args(ctx context.Context,
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_RawDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *dto.PVTime
-	if tmp, ok := rawArgs["begin"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["begin"] = arg0
-	var arg1 *dto.PVTime
-	if tmp, ok := rawArgs["end"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["end"] = arg1
-	return args, nil
-}
-
 func (ec *executionContext) field_Query_ZappiDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *dto.PVTime
+	var arg0 *model.Time
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *dto.PVTime
+	var arg1 *model.Time
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -773,37 +412,37 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 func (ec *executionContext) field_Query_dailyDataSets_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *dto.PVTime
+	var arg0 *model.Time
 	if tmp, ok := rawArgs["begin"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("begin"))
-		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg0, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["begin"] = arg0
-	var arg1 *dto.PVTime
+	var arg1 *model.Time
 	if tmp, ok := rawArgs["end"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("end"))
-		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, tmp)
+		arg1, err = ec.unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["end"] = arg1
-	var arg2 uint32
+	var arg2 int
 	if tmp, ok := rawArgs["EnergyInterval"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("EnergyInterval"))
-		arg2, err = ec.unmarshalNUInt2uint32(ctx, tmp)
+		arg2, err = ec.unmarshalNInt2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["EnergyInterval"] = arg2
-	var arg3 uint32
+	var arg3 int
 	if tmp, ok := rawArgs["startupInterval"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("startupInterval"))
-		arg3, err = ec.unmarshalNUInt2uint32(ctx, tmp)
+		arg3, err = ec.unmarshalNInt2int(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -876,9 +515,9 @@ func (ec *executionContext) _DailyData_date(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.(dto.Date)
+	res := resTmp.(model.Date)
 	fc.Result = res
-	return ec.marshalNDate2pvᚑserviceᚋentitiesᚋdtoᚐDate(ctx, field.Selections, res)
+	return ec.marshalNDate2pvᚑserviceᚋgraphᚋmodelᚐDate(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DailyData_date(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -920,9 +559,9 @@ func (ec *executionContext) _DailyData_startupTime(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(dto.TimeOfDay)
+	res := resTmp.(model.Clock)
 	fc.Result = res
-	return ec.marshalNTimeOfDay2pvᚑserviceᚋentitiesᚋdtoᚐTimeOfDay(ctx, field.Selections, res)
+	return ec.marshalNClock2pvᚑserviceᚋgraphᚋmodelᚐClock(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DailyData_startupTime(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -932,7 +571,7 @@ func (ec *executionContext) fieldContext_DailyData_startupTime(ctx context.Conte
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type TimeOfDay does not have child fields")
+			return nil, errors.New("field of type Clock does not have child fields")
 		},
 	}
 	return fc, nil
@@ -964,9 +603,9 @@ func (ec *executionContext) _DailyData_producedEnergy(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint32)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DailyData_producedEnergy(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -976,7 +615,7 @@ func (ec *executionContext) fieldContext_DailyData_producedEnergy(ctx context.Co
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1008,9 +647,9 @@ func (ec *executionContext) _DailyData_cumulativeEnergy(ctx context.Context, fie
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint32)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_DailyData_cumulativeEnergy(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1020,14 +659,14 @@ func (ec *executionContext) fieldContext_DailyData_cumulativeEnergy(ctx context.
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _MinuteDataOfDay_date(ctx context.Context, field graphql.CollectedField, obj *model.MinuteDataOfDay) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MinuteDataOfDay_date(ctx, field)
+func (ec *executionContext) _MinuteData_date(ctx context.Context, field graphql.CollectedField, obj *model.MinuteData) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MinuteData_date(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1052,14 +691,14 @@ func (ec *executionContext) _MinuteDataOfDay_date(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(dto.Date)
+	res := resTmp.(model.Date)
 	fc.Result = res
-	return ec.marshalNDate2pvᚑserviceᚋentitiesᚋdtoᚐDate(ctx, field.Selections, res)
+	return ec.marshalNDate2pvᚑserviceᚋgraphᚋmodelᚐDate(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_MinuteDataOfDay_date(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_MinuteData_date(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "MinuteDataOfDay",
+		Object:     "MinuteData",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1070,8 +709,8 @@ func (ec *executionContext) fieldContext_MinuteDataOfDay_date(ctx context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _MinuteDataOfDay_dc1I(ctx context.Context, field graphql.CollectedField, obj *model.MinuteDataOfDay) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MinuteDataOfDay_dc1I(ctx, field)
+func (ec *executionContext) _MinuteData_dcI(ctx context.Context, field graphql.CollectedField, obj *model.MinuteData) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MinuteData_dcI(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1084,7 +723,7 @@ func (ec *executionContext) _MinuteDataOfDay_dc1I(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1i, nil
+		return obj.DcI, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1096,107 +735,19 @@ func (ec *executionContext) _MinuteDataOfDay_dc1I(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint32)
+	res := resTmp.([]int)
 	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
+	return ec.marshalNInt2ᚕintᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_MinuteDataOfDay_dc1I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_MinuteData_dcI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "MinuteDataOfDay",
+		Object:     "MinuteData",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _MinuteDataOfDay_dc2I(ctx context.Context, field graphql.CollectedField, obj *model.MinuteDataOfDay) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MinuteDataOfDay_dc2I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2i, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_MinuteDataOfDay_dc2I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "MinuteDataOfDay",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _MinuteDataOfDay_dc3I(ctx context.Context, field graphql.CollectedField, obj *model.MinuteDataOfDay) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_MinuteDataOfDay_dc3I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3i, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_MinuteDataOfDay_dc3I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "MinuteDataOfDay",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
+			return nil, errors.New("field of type Int does not have child fields")
 		},
 	}
 	return fc, nil
@@ -1216,7 +767,7 @@ func (ec *executionContext) _Query_dailyDataSets(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().DailyDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime), fc.Args["EnergyInterval"].(uint32), fc.Args["startupInterval"].(uint32))
+		return ec.resolvers.Query().DailyDataSets(rctx, fc.Args["begin"].(*model.Time), fc.Args["end"].(*model.Time), fc.Args["EnergyInterval"].(int), fc.Args["startupInterval"].(int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1228,9 +779,9 @@ func (ec *executionContext) _Query_dailyDataSets(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.DailyData)
+	res := resTmp.([]model.DailyData)
 	fc.Result = res
-	return ec.marshalNDailyData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐDailyDataᚄ(ctx, field.Selections, res)
+	return ec.marshalNDailyData2ᚕpvᚑserviceᚋgraphᚋmodelᚐDailyDataᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_dailyDataSets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1262,7 +813,7 @@ func (ec *executionContext) fieldContext_Query_dailyDataSets(ctx context.Context
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_dailyDataSets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1281,7 +832,7 @@ func (ec *executionContext) _Query_MinuteDataSets(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MinuteDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime), fc.Args["CurrentInterval"].(uint32))
+		return ec.resolvers.Query().MinuteDataSets(rctx, fc.Args["begin"].(*model.Time), fc.Args["end"].(*model.Time), fc.Args["CurrentInterval"].(int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1293,9 +844,9 @@ func (ec *executionContext) _Query_MinuteDataSets(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.MinuteDataOfDay)
+	res := resTmp.([]model.MinuteData)
 	fc.Result = res
-	return ec.marshalNMinuteDataOfDay2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐMinuteDataOfDayᚄ(ctx, field.Selections, res)
+	return ec.marshalNMinuteData2ᚕpvᚑserviceᚋgraphᚋmodelᚐMinuteDataᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_MinuteDataSets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1307,15 +858,11 @@ func (ec *executionContext) fieldContext_Query_MinuteDataSets(ctx context.Contex
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "date":
-				return ec.fieldContext_MinuteDataOfDay_date(ctx, field)
-			case "dc1I":
-				return ec.fieldContext_MinuteDataOfDay_dc1I(ctx, field)
-			case "dc2I":
-				return ec.fieldContext_MinuteDataOfDay_dc2I(ctx, field)
-			case "dc3I":
-				return ec.fieldContext_MinuteDataOfDay_dc3I(ctx, field)
+				return ec.fieldContext_MinuteData_date(ctx, field)
+			case "dcI":
+				return ec.fieldContext_MinuteData_dcI(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type MinuteDataOfDay", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type MinuteData", field.Name)
 		},
 	}
 	defer func() {
@@ -1327,138 +874,7 @@ func (ec *executionContext) fieldContext_Query_MinuteDataSets(ctx context.Contex
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_MinuteDataSets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_RawDataSets(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_RawDataSets(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().RawDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]*model.RawData)
-	fc.Result = res
-	return ec.marshalNRawData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐRawDataᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_RawDataSets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "Time":
-				return ec.fieldContext_RawData_Time(ctx, field)
-			case "DC1_U":
-				return ec.fieldContext_RawData_DC1_U(ctx, field)
-			case "DC1_I":
-				return ec.fieldContext_RawData_DC1_I(ctx, field)
-			case "DC1_P":
-				return ec.fieldContext_RawData_DC1_P(ctx, field)
-			case "DC1_T":
-				return ec.fieldContext_RawData_DC1_T(ctx, field)
-			case "DC1_S":
-				return ec.fieldContext_RawData_DC1_S(ctx, field)
-			case "DC2_U":
-				return ec.fieldContext_RawData_DC2_U(ctx, field)
-			case "DC2_I":
-				return ec.fieldContext_RawData_DC2_I(ctx, field)
-			case "DC2_P":
-				return ec.fieldContext_RawData_DC2_P(ctx, field)
-			case "DC2_T":
-				return ec.fieldContext_RawData_DC2_T(ctx, field)
-			case "DC2_S":
-				return ec.fieldContext_RawData_DC2_S(ctx, field)
-			case "DC3_U":
-				return ec.fieldContext_RawData_DC3_U(ctx, field)
-			case "DC3_I":
-				return ec.fieldContext_RawData_DC3_I(ctx, field)
-			case "DC3_P":
-				return ec.fieldContext_RawData_DC3_P(ctx, field)
-			case "DC3_T":
-				return ec.fieldContext_RawData_DC3_T(ctx, field)
-			case "DC3_S":
-				return ec.fieldContext_RawData_DC3_S(ctx, field)
-			case "AC1_U":
-				return ec.fieldContext_RawData_AC1_U(ctx, field)
-			case "AC1_I":
-				return ec.fieldContext_RawData_AC1_I(ctx, field)
-			case "AC1_P":
-				return ec.fieldContext_RawData_AC1_P(ctx, field)
-			case "AC1_T":
-				return ec.fieldContext_RawData_AC1_T(ctx, field)
-			case "AC2_U":
-				return ec.fieldContext_RawData_AC2_U(ctx, field)
-			case "AC2_I":
-				return ec.fieldContext_RawData_AC2_I(ctx, field)
-			case "AC2_P":
-				return ec.fieldContext_RawData_AC2_P(ctx, field)
-			case "AC2_T":
-				return ec.fieldContext_RawData_AC2_T(ctx, field)
-			case "AC3_U":
-				return ec.fieldContext_RawData_AC3_U(ctx, field)
-			case "AC3_I":
-				return ec.fieldContext_RawData_AC3_I(ctx, field)
-			case "AC3_P":
-				return ec.fieldContext_RawData_AC3_P(ctx, field)
-			case "AC3_T":
-				return ec.fieldContext_RawData_AC3_T(ctx, field)
-			case "AC_F":
-				return ec.fieldContext_RawData_AC_F(ctx, field)
-			case "FC_I":
-				return ec.fieldContext_RawData_FC_I(ctx, field)
-			case "Ain1":
-				return ec.fieldContext_RawData_Ain1(ctx, field)
-			case "Ain2":
-				return ec.fieldContext_RawData_Ain2(ctx, field)
-			case "Ain3":
-				return ec.fieldContext_RawData_Ain3(ctx, field)
-			case "AC_S":
-				return ec.fieldContext_RawData_AC_S(ctx, field)
-			case "Err":
-				return ec.fieldContext_RawData_Err(ctx, field)
-			case "Ens_Err":
-				return ec.fieldContext_RawData_Ens_Err(ctx, field)
-			case "Event":
-				return ec.fieldContext_RawData_Event(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type RawData", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_RawDataSets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1477,7 +893,7 @@ func (ec *executionContext) _Query_ZappiDataSets(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ZappiDataSets(rctx, fc.Args["begin"].(*dto.PVTime), fc.Args["end"].(*dto.PVTime))
+		return ec.resolvers.Query().ZappiDataSets(rctx, fc.Args["begin"].(*model.Time), fc.Args["end"].(*model.Time))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1489,9 +905,9 @@ func (ec *executionContext) _Query_ZappiDataSets(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.ZappiData)
+	res := resTmp.([]model.ZappiData)
 	fc.Result = res
-	return ec.marshalNZappiData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐZappiDataᚄ(ctx, field.Selections, res)
+	return ec.marshalNZappiData2ᚕpvᚑserviceᚋgraphᚋmodelᚐZappiDataᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_ZappiDataSets(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1525,7 +941,7 @@ func (ec *executionContext) fieldContext_Query_ZappiDataSets(ctx context.Context
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_ZappiDataSets_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1599,7 +1015,7 @@ func (ec *executionContext) fieldContext_Query___type(ctx context.Context, field
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query___type_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1659,1634 +1075,6 @@ func (ec *executionContext) fieldContext_Query___schema(ctx context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _RawData_Time(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Time(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Time, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Time(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC1_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC1_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC1_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC1_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC1_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC1_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC1_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC1_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC1_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC1_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC1_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC1_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC1_S(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC1_S(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc1S, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC1_S(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC2_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC2_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC2_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC2_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC2_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC2_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC2_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC2_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC2_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC2_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC2_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC2_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC2_S(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC2_S(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc2S, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC2_S(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC3_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC3_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC3_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC3_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC3_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC3_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC3_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC3_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC3_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC3_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC3_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC3_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_DC3_S(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_DC3_S(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Dc3S, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_DC3_S(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC1_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC1_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac1U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC1_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC1_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC1_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac1I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC1_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC1_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC1_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac1P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC1_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC1_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC1_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac1T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC1_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC2_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC2_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac2U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC2_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC2_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC2_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac2I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC2_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC2_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC2_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac2P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC2_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC2_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC2_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac2T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC2_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC3_U(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC3_U(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac3U, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC3_U(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC3_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC3_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac3I, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC3_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC3_P(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC3_P(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac3P, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC3_P(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC3_T(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC3_T(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ac3T, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC3_T(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC_F(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC_F(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.AcF, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(float64)
-	fc.Result = res
-	return ec.marshalNFloat2float64(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC_F(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Float does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_FC_I(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_FC_I(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.FcI, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_FC_I(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Ain1(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Ain1(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ain1, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Ain1(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Ain2(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Ain2(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ain2, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Ain2(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Ain3(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Ain3(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Ain3, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Ain3(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_AC_S(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_AC_S(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.AcS, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_AC_S(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Err(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Err(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Err, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(int32)
-	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Err(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Ens_Err(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Ens_Err(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.EnsErr, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(uint32)
-	fc.Result = res
-	return ec.marshalNUInt2uint32(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Ens_Err(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type UInt does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RawData_Event(ctx context.Context, field graphql.CollectedField, obj *model.RawData) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RawData_Event(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Event, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RawData_Event(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RawData",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _ZappiData_zappi_sn(ctx context.Context, field graphql.CollectedField, obj *model.ZappiData) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_ZappiData_zappi_sn(ctx, field)
 	if err != nil {
@@ -3313,9 +1101,9 @@ func (ec *executionContext) _ZappiData_zappi_sn(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int32)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_zappi_sn(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3357,9 +1145,9 @@ func (ec *executionContext) _ZappiData_plugged_in(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(dto.PVTime)
+	res := resTmp.(model.Time)
 	fc.Result = res
-	return ec.marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, field.Selections, res)
+	return ec.marshalNTime2pvᚑserviceᚋgraphᚋmodelᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_plugged_in(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3401,9 +1189,9 @@ func (ec *executionContext) _ZappiData_unplugged(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(dto.PVTime)
+	res := resTmp.(model.Time)
 	fc.Result = res
-	return ec.marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx, field.Selections, res)
+	return ec.marshalNTime2pvᚑserviceᚋgraphᚋmodelᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_unplugged(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -3445,9 +1233,9 @@ func (ec *executionContext) _ZappiData_charge_duration(ctx context.Context, fiel
 		}
 		return graphql.Null
 	}
-	res := resTmp.(int32)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalNInt2int32(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_ZappiData_charge_duration(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -4928,7 +2716,7 @@ func (ec *executionContext) fieldContext___Type_fields(ctx context.Context, fiel
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field___Type_fields_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -5116,7 +2904,7 @@ func (ec *executionContext) fieldContext___Type_enumValues(ctx context.Context, 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field___Type_enumValues_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -5292,97 +3080,97 @@ var dailyDataImplementors = []string{"DailyData"}
 
 func (ec *executionContext) _DailyData(ctx context.Context, sel ast.SelectionSet, obj *model.DailyData) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, dailyDataImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("DailyData")
 		case "date":
-
 			out.Values[i] = ec._DailyData_date(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "startupTime":
-
 			out.Values[i] = ec._DailyData_startupTime(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "producedEnergy":
-
 			out.Values[i] = ec._DailyData_producedEnergy(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "cumulativeEnergy":
-
 			out.Values[i] = ec._DailyData_cumulativeEnergy(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
-var minuteDataOfDayImplementors = []string{"MinuteDataOfDay"}
+var minuteDataImplementors = []string{"MinuteData"}
 
-func (ec *executionContext) _MinuteDataOfDay(ctx context.Context, sel ast.SelectionSet, obj *model.MinuteDataOfDay) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, minuteDataOfDayImplementors)
+func (ec *executionContext) _MinuteData(ctx context.Context, sel ast.SelectionSet, obj *model.MinuteData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, minuteDataImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("MinuteDataOfDay")
+			out.Values[i] = graphql.MarshalString("MinuteData")
 		case "date":
-
-			out.Values[i] = ec._MinuteDataOfDay_date(ctx, field, obj)
-
+			out.Values[i] = ec._MinuteData_date(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
-		case "dc1I":
-
-			out.Values[i] = ec._MinuteDataOfDay_dc1I(ctx, field, obj)
-
+		case "dcI":
+			out.Values[i] = ec._MinuteData_dcI(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "dc2I":
-
-			out.Values[i] = ec._MinuteDataOfDay_dc2I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "dc3I":
-
-			out.Values[i] = ec._MinuteDataOfDay_dc3I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -5395,7 +3183,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	})
 
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
 			Object: field.Name,
@@ -5408,7 +3196,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		case "dailyDataSets":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -5416,22 +3204,21 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_dailyDataSets(ctx, field)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
 			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "MinuteDataSets":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -5439,45 +3226,21 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_MinuteDataSets(ctx, field)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
 			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
-		case "RawDataSets":
-			field := field
-
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_RawDataSets(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
-			}
-
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "ZappiDataSets":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -5485,318 +3248,45 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}()
 				res = ec._Query_ZappiDataSets(ctx, field)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
 			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
-
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
 			})
-
 		case "__schema":
-
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
-	return out
-}
 
-var rawDataImplementors = []string{"RawData"}
-
-func (ec *executionContext) _RawData(ctx context.Context, sel ast.SelectionSet, obj *model.RawData) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, rawDataImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("RawData")
-		case "Time":
-
-			out.Values[i] = ec._RawData_Time(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC1_U":
-
-			out.Values[i] = ec._RawData_DC1_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC1_I":
-
-			out.Values[i] = ec._RawData_DC1_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC1_P":
-
-			out.Values[i] = ec._RawData_DC1_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC1_T":
-
-			out.Values[i] = ec._RawData_DC1_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC1_S":
-
-			out.Values[i] = ec._RawData_DC1_S(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC2_U":
-
-			out.Values[i] = ec._RawData_DC2_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC2_I":
-
-			out.Values[i] = ec._RawData_DC2_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC2_P":
-
-			out.Values[i] = ec._RawData_DC2_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC2_T":
-
-			out.Values[i] = ec._RawData_DC2_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC2_S":
-
-			out.Values[i] = ec._RawData_DC2_S(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC3_U":
-
-			out.Values[i] = ec._RawData_DC3_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC3_I":
-
-			out.Values[i] = ec._RawData_DC3_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC3_P":
-
-			out.Values[i] = ec._RawData_DC3_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC3_T":
-
-			out.Values[i] = ec._RawData_DC3_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "DC3_S":
-
-			out.Values[i] = ec._RawData_DC3_S(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC1_U":
-
-			out.Values[i] = ec._RawData_AC1_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC1_I":
-
-			out.Values[i] = ec._RawData_AC1_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC1_P":
-
-			out.Values[i] = ec._RawData_AC1_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC1_T":
-
-			out.Values[i] = ec._RawData_AC1_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC2_U":
-
-			out.Values[i] = ec._RawData_AC2_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC2_I":
-
-			out.Values[i] = ec._RawData_AC2_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC2_P":
-
-			out.Values[i] = ec._RawData_AC2_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC2_T":
-
-			out.Values[i] = ec._RawData_AC2_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC3_U":
-
-			out.Values[i] = ec._RawData_AC3_U(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC3_I":
-
-			out.Values[i] = ec._RawData_AC3_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC3_P":
-
-			out.Values[i] = ec._RawData_AC3_P(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC3_T":
-
-			out.Values[i] = ec._RawData_AC3_T(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC_F":
-
-			out.Values[i] = ec._RawData_AC_F(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "FC_I":
-
-			out.Values[i] = ec._RawData_FC_I(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Ain1":
-
-			out.Values[i] = ec._RawData_Ain1(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Ain2":
-
-			out.Values[i] = ec._RawData_Ain2(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Ain3":
-
-			out.Values[i] = ec._RawData_Ain3(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "AC_S":
-
-			out.Values[i] = ec._RawData_AC_S(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Err":
-
-			out.Values[i] = ec._RawData_Err(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Ens_Err":
-
-			out.Values[i] = ec._RawData_Ens_Err(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "Event":
-
-			out.Values[i] = ec._RawData_Event(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
 	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
+
 	return out
 }
 
@@ -5804,55 +3294,58 @@ var zappiDataImplementors = []string{"ZappiData"}
 
 func (ec *executionContext) _ZappiData(ctx context.Context, sel ast.SelectionSet, obj *model.ZappiData) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, zappiDataImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ZappiData")
 		case "zappi_sn":
-
 			out.Values[i] = ec._ZappiData_zappi_sn(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "plugged_in":
-
 			out.Values[i] = ec._ZappiData_plugged_in(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "unplugged":
-
 			out.Values[i] = ec._ZappiData_unplugged(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "charge_duration":
-
 			out.Values[i] = ec._ZappiData_charge_duration(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "electricity":
-
 			out.Values[i] = ec._ZappiData_electricity(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -5860,52 +3353,55 @@ var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __DirectiveImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Directive")
 		case "name":
-
 			out.Values[i] = ec.___Directive_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___Directive_description(ctx, field, obj)
-
 		case "locations":
-
 			out.Values[i] = ec.___Directive_locations(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "args":
-
 			out.Values[i] = ec.___Directive_args(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "isRepeatable":
-
 			out.Values[i] = ec.___Directive_isRepeatable(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -5913,42 +3409,47 @@ var __EnumValueImplementors = []string{"__EnumValue"}
 
 func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.EnumValue) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __EnumValueImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__EnumValue")
 		case "name":
-
 			out.Values[i] = ec.___EnumValue_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___EnumValue_description(ctx, field, obj)
-
 		case "isDeprecated":
-
 			out.Values[i] = ec.___EnumValue_isDeprecated(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "deprecationReason":
-
 			out.Values[i] = ec.___EnumValue_deprecationReason(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -5956,56 +3457,57 @@ var __FieldImplementors = []string{"__Field"}
 
 func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, obj *introspection.Field) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __FieldImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Field")
 		case "name":
-
 			out.Values[i] = ec.___Field_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___Field_description(ctx, field, obj)
-
 		case "args":
-
 			out.Values[i] = ec.___Field_args(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "type":
-
 			out.Values[i] = ec.___Field_type(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "isDeprecated":
-
 			out.Values[i] = ec.___Field_isDeprecated(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "deprecationReason":
-
 			out.Values[i] = ec.___Field_deprecationReason(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -6013,42 +3515,47 @@ var __InputValueImplementors = []string{"__InputValue"}
 
 func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.InputValue) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __InputValueImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__InputValue")
 		case "name":
-
 			out.Values[i] = ec.___InputValue_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___InputValue_description(ctx, field, obj)
-
 		case "type":
-
 			out.Values[i] = ec.___InputValue_type(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "defaultValue":
-
 			out.Values[i] = ec.___InputValue_defaultValue(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -6056,53 +3563,54 @@ var __SchemaImplementors = []string{"__Schema"}
 
 func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet, obj *introspection.Schema) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __SchemaImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Schema")
 		case "description":
-
 			out.Values[i] = ec.___Schema_description(ctx, field, obj)
-
 		case "types":
-
 			out.Values[i] = ec.___Schema_types(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "queryType":
-
 			out.Values[i] = ec.___Schema_queryType(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "mutationType":
-
 			out.Values[i] = ec.___Schema_mutationType(ctx, field, obj)
-
 		case "subscriptionType":
-
 			out.Values[i] = ec.___Schema_subscriptionType(ctx, field, obj)
-
 		case "directives":
-
 			out.Values[i] = ec.___Schema_directives(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -6110,63 +3618,56 @@ var __TypeImplementors = []string{"__Type"}
 
 func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, obj *introspection.Type) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __TypeImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Type")
 		case "kind":
-
 			out.Values[i] = ec.___Type_kind(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "name":
-
 			out.Values[i] = ec.___Type_name(ctx, field, obj)
-
 		case "description":
-
 			out.Values[i] = ec.___Type_description(ctx, field, obj)
-
 		case "fields":
-
 			out.Values[i] = ec.___Type_fields(ctx, field, obj)
-
 		case "interfaces":
-
 			out.Values[i] = ec.___Type_interfaces(ctx, field, obj)
-
 		case "possibleTypes":
-
 			out.Values[i] = ec.___Type_possibleTypes(ctx, field, obj)
-
 		case "enumValues":
-
 			out.Values[i] = ec.___Type_enumValues(ctx, field, obj)
-
 		case "inputFields":
-
 			out.Values[i] = ec.___Type_inputFields(ctx, field, obj)
-
 		case "ofType":
-
 			out.Values[i] = ec.___Type_ofType(ctx, field, obj)
-
 		case "specifiedByURL":
-
 			out.Values[i] = ec.___Type_specifiedByURL(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -6189,7 +3690,21 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNDailyData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐDailyDataᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.DailyData) graphql.Marshaler {
+func (ec *executionContext) unmarshalNClock2pvᚑserviceᚋgraphᚋmodelᚐClock(ctx context.Context, v interface{}) (model.Clock, error) {
+	var res model.Clock
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNClock2pvᚑserviceᚋgraphᚋmodelᚐClock(ctx context.Context, sel ast.SelectionSet, v model.Clock) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNDailyData2pvᚑserviceᚋgraphᚋmodelᚐDailyData(ctx context.Context, sel ast.SelectionSet, v model.DailyData) graphql.Marshaler {
+	return ec._DailyData(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDailyData2ᚕpvᚑserviceᚋgraphᚋmodelᚐDailyDataᚄ(ctx context.Context, sel ast.SelectionSet, v []model.DailyData) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -6213,7 +3728,7 @@ func (ec *executionContext) marshalNDailyData2ᚕᚖpvᚑserviceᚋgraphᚋmodel
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNDailyData2ᚖpvᚑserviceᚋgraphᚋmodelᚐDailyData(ctx, sel, v[i])
+			ret[i] = ec.marshalNDailyData2pvᚑserviceᚋgraphᚋmodelᚐDailyData(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -6233,23 +3748,13 @@ func (ec *executionContext) marshalNDailyData2ᚕᚖpvᚑserviceᚋgraphᚋmodel
 	return ret
 }
 
-func (ec *executionContext) marshalNDailyData2ᚖpvᚑserviceᚋgraphᚋmodelᚐDailyData(ctx context.Context, sel ast.SelectionSet, v *model.DailyData) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._DailyData(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalNDate2pvᚑserviceᚋentitiesᚋdtoᚐDate(ctx context.Context, v interface{}) (dto.Date, error) {
-	var res dto.Date
+func (ec *executionContext) unmarshalNDate2pvᚑserviceᚋgraphᚋmodelᚐDate(ctx context.Context, v interface{}) (model.Date, error) {
+	var res model.Date
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNDate2pvᚑserviceᚋentitiesᚋdtoᚐDate(ctx context.Context, sel ast.SelectionSet, v dto.Date) graphql.Marshaler {
+func (ec *executionContext) marshalNDate2pvᚑserviceᚋgraphᚋmodelᚐDate(ctx context.Context, sel ast.SelectionSet, v model.Date) graphql.Marshaler {
 	return v
 }
 
@@ -6268,13 +3773,13 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 	return graphql.WrapContextMarshaler(ctx, res)
 }
 
-func (ec *executionContext) unmarshalNInt2int32(ctx context.Context, v interface{}) (int32, error) {
-	res, err := graphql.UnmarshalInt32(v)
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNInt2int32(ctx context.Context, sel ast.SelectionSet, v int32) graphql.Marshaler {
-	res := graphql.MarshalInt32(v)
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -6283,7 +3788,43 @@ func (ec *executionContext) marshalNInt2int32(ctx context.Context, sel ast.Selec
 	return res
 }
 
-func (ec *executionContext) marshalNMinuteDataOfDay2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐMinuteDataOfDayᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MinuteDataOfDay) graphql.Marshaler {
+func (ec *executionContext) unmarshalNInt2ᚕintᚄ(ctx context.Context, v interface{}) ([]int, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]int, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNInt2int(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNInt2ᚕintᚄ(ctx context.Context, sel ast.SelectionSet, v []int) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNInt2int(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMinuteData2pvᚑserviceᚋgraphᚋmodelᚐMinuteData(ctx context.Context, sel ast.SelectionSet, v model.MinuteData) graphql.Marshaler {
+	return ec._MinuteData(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMinuteData2ᚕpvᚑserviceᚋgraphᚋmodelᚐMinuteDataᚄ(ctx context.Context, sel ast.SelectionSet, v []model.MinuteData) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -6307,7 +3848,7 @@ func (ec *executionContext) marshalNMinuteDataOfDay2ᚕᚖpvᚑserviceᚋgraph�
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNMinuteDataOfDay2ᚖpvᚑserviceᚋgraphᚋmodelᚐMinuteDataOfDay(ctx, sel, v[i])
+			ret[i] = ec.marshalNMinuteData2pvᚑserviceᚋgraphᚋmodelᚐMinuteData(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -6325,70 +3866,6 @@ func (ec *executionContext) marshalNMinuteDataOfDay2ᚕᚖpvᚑserviceᚋgraph�
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalNMinuteDataOfDay2ᚖpvᚑserviceᚋgraphᚋmodelᚐMinuteDataOfDay(ctx context.Context, sel ast.SelectionSet, v *model.MinuteDataOfDay) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._MinuteDataOfDay(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNRawData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐRawDataᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RawData) graphql.Marshaler {
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNRawData2ᚖpvᚑserviceᚋgraphᚋmodelᚐRawData(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNRawData2ᚖpvᚑserviceᚋgraphᚋmodelᚐRawData(ctx context.Context, sel ast.SelectionSet, v *model.RawData) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._RawData(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
@@ -6406,42 +3883,21 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) unmarshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, v interface{}) (dto.PVTime, error) {
-	var res dto.PVTime
+func (ec *executionContext) unmarshalNTime2pvᚑserviceᚋgraphᚋmodelᚐTime(ctx context.Context, v interface{}) (model.Time, error) {
+	var res model.Time
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNTime2pvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, sel ast.SelectionSet, v dto.PVTime) graphql.Marshaler {
+func (ec *executionContext) marshalNTime2pvᚑserviceᚋgraphᚋmodelᚐTime(ctx context.Context, sel ast.SelectionSet, v model.Time) graphql.Marshaler {
 	return v
 }
 
-func (ec *executionContext) unmarshalNTimeOfDay2pvᚑserviceᚋentitiesᚋdtoᚐTimeOfDay(ctx context.Context, v interface{}) (dto.TimeOfDay, error) {
-	var res dto.TimeOfDay
-	err := res.UnmarshalGQL(v)
-	return res, graphql.ErrorOnPath(ctx, err)
+func (ec *executionContext) marshalNZappiData2pvᚑserviceᚋgraphᚋmodelᚐZappiData(ctx context.Context, sel ast.SelectionSet, v model.ZappiData) graphql.Marshaler {
+	return ec._ZappiData(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNTimeOfDay2pvᚑserviceᚋentitiesᚋdtoᚐTimeOfDay(ctx context.Context, sel ast.SelectionSet, v dto.TimeOfDay) graphql.Marshaler {
-	return v
-}
-
-func (ec *executionContext) unmarshalNUInt2uint32(ctx context.Context, v interface{}) (uint32, error) {
-	res, err := graphql.UnmarshalUint32(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalNUInt2uint32(ctx context.Context, sel ast.SelectionSet, v uint32) graphql.Marshaler {
-	res := graphql.MarshalUint32(v)
-	if res == graphql.Null {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-	}
-	return res
-}
-
-func (ec *executionContext) marshalNZappiData2ᚕᚖpvᚑserviceᚋgraphᚋmodelᚐZappiDataᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ZappiData) graphql.Marshaler {
+func (ec *executionContext) marshalNZappiData2ᚕpvᚑserviceᚋgraphᚋmodelᚐZappiDataᚄ(ctx context.Context, sel ast.SelectionSet, v []model.ZappiData) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -6465,7 +3921,7 @@ func (ec *executionContext) marshalNZappiData2ᚕᚖpvᚑserviceᚋgraphᚋmodel
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNZappiData2ᚖpvᚑserviceᚋgraphᚋmodelᚐZappiData(ctx, sel, v[i])
+			ret[i] = ec.marshalNZappiData2pvᚑserviceᚋgraphᚋmodelᚐZappiData(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -6483,16 +3939,6 @@ func (ec *executionContext) marshalNZappiData2ᚕᚖpvᚑserviceᚋgraphᚋmodel
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalNZappiData2ᚖpvᚑserviceᚋgraphᚋmodelᚐZappiData(ctx context.Context, sel ast.SelectionSet, v *model.ZappiData) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._ZappiData(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -6790,16 +4236,16 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	return res
 }
 
-func (ec *executionContext) unmarshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, v interface{}) (*dto.PVTime, error) {
+func (ec *executionContext) unmarshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx context.Context, v interface{}) (*model.Time, error) {
 	if v == nil {
 		return nil, nil
 	}
-	var res = new(dto.PVTime)
+	var res = new(model.Time)
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOTime2ᚖpvᚑserviceᚋentitiesᚋdtoᚐPVTime(ctx context.Context, sel ast.SelectionSet, v *dto.PVTime) graphql.Marshaler {
+func (ec *executionContext) marshalOTime2ᚖpvᚑserviceᚋgraphᚋmodelᚐTime(ctx context.Context, sel ast.SelectionSet, v *model.Time) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}

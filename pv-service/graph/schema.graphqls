@@ -2,15 +2,13 @@
 #
 # https://gqlgen.com/getting-started/
 scalar Time
-scalar TimeOfDay
+scalar Clock
 scalar Date
-scalar UInt
 
 
 type Query {
-    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" EnergyInterval:UInt!=1 startupInterval:UInt!=1): [DailyData!]!
-    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" CurrentInterval:UInt!=1): [MinuteDataOfDay!]!
-    RawDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [RawData!]!
+    dailyDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" EnergyInterval:Int!=1 startupInterval:Int!=1): [DailyData!]!
+    MinuteDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z" CurrentInterval:Int!=1): [MinuteData!]!
     ZappiDataSets(begin: Time="2010-01-01T00:00:00Z" end: Time="9999-12-31T00:00:00Z"): [ZappiData!]!
 }
 type ZappiData {
@@ -22,59 +20,11 @@ type ZappiData {
 }
 type DailyData{
     date: Date!
-    startupTime: TimeOfDay!
-    producedEnergy: UInt!
-    cumulativeEnergy: UInt!
+    startupTime: Clock!
+    producedEnergy: Int!
+    cumulativeEnergy: Int!
 }
-type MinuteDataOfDay{
+type MinuteData{
     date: Date!
-    dc1I: UInt!
-    dc2I: UInt!
-    dc3I: UInt!
-}
-type RawData {
-    Time: UInt!
-
-    DC1_U: UInt!
-    DC1_I: UInt!
-    DC1_P: UInt!
-    DC1_T: UInt!
-    DC1_S: UInt!
-
-    DC2_U: UInt!
-    DC2_I: UInt!
-    DC2_P: UInt!
-    DC2_T: UInt!
-    DC2_S: UInt!
-
-    DC3_U: UInt!
-    DC3_I: UInt!
-    DC3_P: UInt!
-    DC3_T: UInt!
-    DC3_S: UInt!
-
-    AC1_U: UInt!
-    AC1_I: UInt!
-    AC1_P: Int!
-    AC1_T: UInt!
-
-    AC2_U: UInt!
-    AC2_I: UInt!
-    AC2_P: Int!
-    AC2_T: UInt!
-
-    AC3_U: UInt!
-    AC3_I: UInt!
-    AC3_P: Int!
-    AC3_T: UInt!
-
-    AC_F: Float!
-    FC_I: Int!
-    Ain1: Int!
-    Ain2: Int!
-    Ain3: Int!
-    AC_S: UInt!
-    Err: Int!
-    Ens_Err: UInt!
-    Event: String!
+    dcI: [Int!]!
 }

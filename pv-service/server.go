@@ -6,7 +6,7 @@ import (
 	"os"
 	"pv-service/graph"
 	"pv-service/graph/generated"
-	"pv-service/processing"
+	"pv-service/service"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -20,7 +20,7 @@ func main() {
 		port = defaultPort
 	}
 
-	processor, err := processing.GetProcessor()
+	processor, err := processing.GetService()
 	if err != nil {
 		log.Printf("Error on startup has occured: %v", err)
 		panic(err)

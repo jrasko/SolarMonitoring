@@ -2,8 +2,8 @@ package graph
 
 //go:generate go run github.com/99designs/gqlgen generate
 
-import "pv-service/processing"
+import "pv-service/service"
 
 type Resolver struct {
-	Processor processing.Processor
+	Processor processing.Service
 }
