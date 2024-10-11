@@ -1,4 +1,4 @@
 /.idea/
 *.iml
 **/node_modules
-solar/import.sh
+infrastructure/import.sh

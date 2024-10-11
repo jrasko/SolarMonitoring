@@ -1,9 +1,9 @@
 version: "3.8"
+name: solar
 services:
-  # My grafana service
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:10.0.3
+    image: grafana/grafana:10.4.10
     container_name: solar_grafana
     labels:
       traefik.enable: true
@@ -23,7 +23,7 @@ services:
       - traefik
   postgres:
     restart: unless-stopped
-    image: postgres:14
+    image: postgres:16
     container_name: solar_db
     environment:
       POSTGRES_USER: raskob
@@ -34,6 +34,7 @@ services:
   webservice:
     build: ../pv-service
     container_name: solar_backend
+    image: solar-backend
     labels:
       traefik.enable: true
       traefik.http.routers.webservice.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar/query`)"
