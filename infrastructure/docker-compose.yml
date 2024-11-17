@@ -1,9 +1,8 @@
-version: "3.8"
 name: solar
 services:
   grafana:
     restart: unless-stopped
-    image: grafana/grafana:10.4.10
+    image: grafana/grafana:latest
     container_name: solar_grafana
     labels:
       traefik.enable: true
@@ -11,7 +10,6 @@ services:
       traefik.http.routers.grafana.entrypoints: websecure
       traefik.http.routers.grafana.tls.certresolver: myresolver
     environment:
-      GF_INSTALL_PLUGINS: "fifemon-graphql-datasource"
       GF_SERVER_DOMAIN: "raskobvpn.ddns.net"
       GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/solar"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
@@ -26,15 +24,16 @@ services:
     image: postgres:16
     container_name: solar_db
     environment:
-      POSTGRES_USER: raskob
-      POSTGRES_PASSWORD: raskob
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
   webservice:
     build: ../pv-service
     container_name: solar_backend
     image: solar-backend
+    env_file:
+      - .env
     labels:
       traefik.enable: true
       traefik.http.routers.webservice.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar/query`)"

@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"pv-service/database"
 	"pv-service/graph"
 	"pv-service/graph/generated"
 	"pv-service/service"
@@ -12,19 +13,17 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 )
 
-const defaultPort = "8080"
+const port = "8080"
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
+	cfg := loadConfig()
+	dbConnection, err := database.GetDBConnection(cfg.DBHost, cfg.DBUser, cfg.DBPassword)
+	if err != nil {
+		log.Fatalf("Error on startup has occured: %v", err)
 	}
 
-	processor, err := processing.GetService()
-	if err != nil {
-		log.Printf("Error on startup has occured: %v", err)
-		panic(err)
-	}
+	processor := processing.New(dbConnection)
+
 	srv := handler.NewDefaultServer(
 		generated.NewExecutableSchema(
 			generated.Config{
@@ -40,4 +39,18 @@ func main() {
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+type Config struct {
+	DBUser     string
+	DBPassword string
+	DBHost     string
+}
+
+func loadConfig() Config {
+	return Config{
+		DBHost:     os.Getenv("DB_HOST"),
+		DBUser:     os.Getenv("DB_USER"),
+		DBPassword: os.Getenv("DB_PASSWORD"),
+	}
 }

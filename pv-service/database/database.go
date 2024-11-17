@@ -2,41 +2,27 @@ package database
 
 import (
 	"context"
-	"log"
-	"os"
+	"fmt"
 	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
-type DBConnection struct {
+type Connection struct {
 	postgres *gorm.DB
 }
 
-func GetDBConnection() (DBConnection, error) {
-	var dbConn DBConnection
-	if err := dbConn.ConnectToDB(); err != nil {
-		return DBConnection{}, err
-	}
-	return dbConn, nil
+func GetDBConnection(host, user, password string) (Connection, error) {
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=postgres port=5432", host, user, password)
+
+	db, err := gorm.Open(
+		postgres.Open(dsn),
+	)
+	return Connection{postgres: db}, err
 }
 
-func (c *DBConnection) ConnectToDB() error {
-	db, err := gorm.Open(postgres.Open("host=solar_db user=raskob password=raskob dbname=postgres port=5432"), &gorm.Config{
-		Logger: logger.New(
-			log.New(os.Stdout, "\n", log.LstdFlags),
-			logger.Config{SlowThreshold: time.Second}),
-	})
-	if err != nil {
-		return err
-	}
-	c.postgres = db
-	return nil
-}
-
-func (c *DBConnection) GetNonDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]MinuteData, error) {
+func (c *Connection) GetNonDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]MinuteData, error) {
 	var data dbMinuteDataSet
 
 	err := c.postgres.
@@ -48,7 +34,7 @@ func (c *DBConnection) GetNonDailyData(ctx context.Context, startTime uint32, en
 	return data.toExternal(), err
 }
 
-func (c *DBConnection) GetDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]DailyData, error) {
+func (c *Connection) GetDailyData(ctx context.Context, startTime uint32, endTime uint32) ([]DailyData, error) {
 	var data []DailyData
 
 	err := c.postgres.
@@ -60,7 +46,7 @@ func (c *DBConnection) GetDailyData(ctx context.Context, startTime uint32, endTi
 	return data, err
 }
 
-func (c *DBConnection) GetZappiData(ctx context.Context, begin time.Time, end time.Time) ([]ZappiData, error) {
+func (c *Connection) GetZappiData(ctx context.Context, begin time.Time, end time.Time) ([]ZappiData, error) {
 	var data []ZappiData
 
 	err := c.postgres.

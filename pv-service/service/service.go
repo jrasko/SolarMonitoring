@@ -8,15 +8,11 @@ import (
 )
 
 type Service struct {
-	db database.DBConnection
+	db database.Connection
 }
 
-func GetService() (Service, error) {
-	connection, err := database.GetDBConnection()
-	if err != nil {
-		return Service{}, err
-	}
-	return Service{db: connection}, nil
+func New(connection database.Connection) Service {
+	return Service{db: connection}
 }
 
 func (p Service) GetMinuteDataOfDay(ctx context.Context, start *model.Time, end *model.Time, currentInterval int) (model.MinuteDataSet, error) {
