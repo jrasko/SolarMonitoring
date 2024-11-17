@@ -10,7 +10,6 @@ import (
 	"pv-service/service"
 
 	"github.com/99designs/gqlgen/graphql/handler"
-	"github.com/99designs/gqlgen/graphql/playground"
 )
 
 const port = "8080"
@@ -34,8 +33,8 @@ func main() {
 		),
 	)
 
-	http.Handle("/", playground.Handler("GraphQL playground", "/solar/query"))
-	http.Handle("/solar/query", srv)
+	// http.Handle("/", playground.Handler("GraphQL playground", "/solar/query"))
+	http.Handle("/solar/query", basicAuth(srv, cfg.BasicUsername, cfg.BasicPassword))
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
@@ -45,12 +44,30 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBHost     string
+
+	BasicUsername string
+	BasicPassword string
 }
 
 func loadConfig() Config {
 	return Config{
-		DBHost:     os.Getenv("DB_HOST"),
 		DBUser:     os.Getenv("DB_USER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
+		DBHost:     os.Getenv("DB_HOST"),
+
+		BasicUsername: os.Getenv("BASIC_USERNAME"),
+		BasicPassword: os.Getenv("BASIC_PASSWORD"),
 	}
+}
+
+func basicAuth(next http.Handler, username, password string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if ok && user == username && pass == password {
+			next.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	})
 }
