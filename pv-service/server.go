@@ -10,6 +10,7 @@ import (
 	"pv-service/service"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/playground"
 )
 
 const port = "8080"
@@ -33,11 +34,20 @@ func main() {
 		),
 	)
 
-	// http.Handle("/", playground.Handler("GraphQL playground", "/solar/query"))
 	http.Handle("/solar/query", basicAuth(srv, cfg.BasicUsername, cfg.BasicPassword))
+	http.Handle("/solar/query/health", basicAuth(health(), cfg.BasicUsername, cfg.BasicPassword))
+	http.Handle("/solar/query/playground", basicAuth(
+		playground.Handler("GraphQL playground", "/solar/query"), cfg.BasicUsername, cfg.BasicPassword),
+	)
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+func health() http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+	}
 }
 
 type Config struct {

@@ -10,8 +10,9 @@ services:
       traefik.http.routers.grafana.entrypoints: websecure
       traefik.http.routers.grafana.tls.certresolver: myresolver
     environment:
+      GF_SERVER_PROTOCOL: "http"
       GF_SERVER_DOMAIN: "raskobvpn.ddns.net"
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/solar"
+      GF_SERVER_ROOT_URL: "https://%(domain)s/solar"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_DATE_FORMATS_INTERVAL_HOUR: "DD/MM/YYYY HH:mm"
       GF_DATE_FORMATS_INTERVAL_DAY: "DD/MM"
