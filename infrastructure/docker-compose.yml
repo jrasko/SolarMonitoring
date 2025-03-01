@@ -27,6 +27,9 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-d", "db_prod" ]
+      start_period: 30s
     volumes:
       - postgres_data:/var/lib/postgresql/data
   webservice:
