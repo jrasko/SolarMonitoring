@@ -20,6 +20,8 @@ services:
       - grafana-data:/var/lib/grafana
     networks:
       - traefik
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"
   postgres:
     restart: unless-stopped
     image: postgres:16
@@ -44,7 +46,8 @@ services:
       traefik.http.routers.webservice.entrypoints: websecure
       traefik.http.routers.webservice.tls.certresolver: myresolver
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - traefik
