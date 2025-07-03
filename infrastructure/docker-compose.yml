@@ -6,7 +6,7 @@ services:
     container_name: solar_grafana
     labels:
       traefik.enable: true
-      traefik.http.routers.grafana.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar`)"
+      traefik.http.routers.grafana.rule: PathPrefix(`/solar`)
       traefik.http.routers.grafana.entrypoints: websecure
       traefik.http.routers.grafana.tls.certresolver: myresolver
     environment:
@@ -42,9 +42,10 @@ services:
       - .env
     labels:
       traefik.enable: true
-      traefik.http.routers.webservice.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar/query`)"
+      traefik.http.routers.webservice.rule: PathPrefix(`/solar/query`)
       traefik.http.routers.webservice.entrypoints: websecure
       traefik.http.routers.webservice.tls.certresolver: myresolver
+      traefik.http.routers.dashboard.middlewares: traefik-auth@docker
     depends_on:
       postgres:
         condition: service_healthy
