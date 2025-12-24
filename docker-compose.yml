@@ -31,16 +31,17 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -d postgres -U $${POSTGRES_USER}"]
+      test: [ "CMD-SHELL", "pg_isready -d postgres -U $${POSTGRES_USER}" ]
       start_period: 30s
     volumes:
       - postgres_data:/var/lib/postgresql/data
   webservice:
-    build: ../pv-service
     container_name: solar_backend
-    image: solar-backend
-    env_file:
-      - .env
+    image: ghcr.io/jrasko/solar-monitoring:latest
+    environment:
+      DB_HOST: solar_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     labels:
       traefik.enable: true
       traefik.http.routers.webservice.rule: "Host(`raskobvpn.ddns.net`) && PathPrefix(`/solar/query`)"
