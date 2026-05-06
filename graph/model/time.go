@@ -63,7 +63,7 @@ func (t *Time) AsStartUnix() uint32 {
 }
 
 func (t *Time) AsEndUnix() uint32 {
-	if t != nil {
+	if t == nil {
 		return uint32(math.MaxUint32)
 	}
 	return t.toUnix() + 12*hour
